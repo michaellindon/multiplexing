@@ -29,16 +29,16 @@ intensity=lam_star*cdf(Normal(0,1),g)
 plot(x,intensity)
 intensity1(arg)=intensity[maximum(find( y->(y <= arg), x))]
 
-tobs=8
-lam_dom=lam_star
-no=rand(Poisson(lam_dom*tobs))
-o=sort(rand(Uniform(0,tobs),no))
+T=8
+λ=lam_star
+no=rand(Poisson(λ*T))
+o=sort(rand(Uniform(0,T),no))
 oacc=Array(Float64,0)
 othin=Array(Float64,0)
 binary=Array(Int64,0)
 for i=1:no
 	u=rand(Uniform(0,1))
-	if(u<=intensity1(o[i])/lam_dom)
+	if(u<=intensity1(o[i])/λ)
 		#Accept
 		push!(oacc,o[i])
 		push!(binary,1)
@@ -69,7 +69,7 @@ M=C*inv(eye(no)+C)
 L=chol(M)'
 
 
-for iter=1:100
+for iter=1:10
 	Z=Array(Float64,no);
 	for i=1:no
 		if(binary[i]==1)
@@ -91,8 +91,8 @@ for iter=1:100
 	#=L=chol(M)';=#
 	g=M*Z+L*rand(Normal(0,1),no);
 	plot(o,lam_star*cdf(Normal(0,1),g),c="grey",alpha=0.1);
-	n_prop=rand(Poisson(lam_dom*tobs));
-	oprop=sort(rand(Uniform(0,tobs),n_prop));
+	n_prop=rand(Poisson(λ*T));
+	oprop=sort(rand(Uniform(0,T),n_prop));
 	Cpp=Array(Float64,n_prop,n_prop);
 	for i=1:n_prop
 		for j=1:n_prop
@@ -111,7 +111,7 @@ for iter=1:100
 	othin=Array(Float64,0);
 	for i=1:n_prop
 		u=rand(Uniform(0,1))
-		if(u<=lam_star*cdf(Normal(0,1),gprop[i])/lam_dom)
+		if(u<=lam_star*cdf(Normal(0,1),gprop[i])/λ)
 			#Accept
 		else 
 			#Thin
