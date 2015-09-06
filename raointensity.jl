@@ -2,7 +2,7 @@ using Distributions #Random Variable Package
 using PyPlot #Plotting Package
 
 
-srand(10); #Set Seed
+srand(11); #Set Seed
 d=2; #Dimensionality of State space
 
 ###Create Generator Matrix A###
@@ -87,6 +87,20 @@ prior_initial=ones(d)/d; #Prior on Zeroeth State S0
 niter=1000
 for iter=1:niter
 
+lam_dom=80
+n_dom=rand(Poisson(lam_dom*tobs))
+o_dom=sort(rand(Uniform(0,tobs),n_dom))
+o_thin=Array(Float64,0)
+for i=1:n_dom
+	u=rand(Uniform(0,1))
+	if(u<=lam(o_dom[i],state(o_dom[i]))/lam_dom)
+		#Accept
+	else 
+		#Thin
+		push!(o_thin,o_dom[i])
+	end
+end
+
 	U=Array(Float64,0);
 	for i=1:length(T)-1
 		nu=rand(Poisson(Omega-abs(A[S[i],S[i]])))
@@ -118,7 +132,7 @@ for iter=1:niter
 			end
 			likethin=0
 			if(nt!=0)
-				likethin=sum((1-map(lam,thinned,i*ones(nt))/lam_dom))
+				likethin=sum(log(1-map(lam,thinned,i*ones(nt))/lam_dom))
 			end
 			logL[i,k]=(no+nt)*log(lam_dom)-lam_dom*(W[k+1]-W[k])+likeobs+likethin;
 		end

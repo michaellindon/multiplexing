@@ -3,7 +3,7 @@ using PyPlot #Plotting Package
 
 O=1 #Zero Indexing
 
-srand(4); #Set Seed
+srand(2); #Set Seed
 d=2; #Dimensionality of State space
 
 ###Create Generator Matrix Q###
@@ -28,7 +28,7 @@ s=Array(Int64,1)
 transition_times[1]=0
 s[1]=1
 while(t<=Tobs)
-	t=t+rand(Exponential(rho[1]))
+	t=t+rand(Exponential(rho[s[end]]))
 	if(t<Tobs)
 		push!(transition_times,t)
 		push!(s,rand(Categorical(vec(P[s[end],1:d]))))
@@ -40,7 +40,7 @@ plot([0:0.01:Tobs],map(state,[0:0.01:Tobs])); PyPlot.ylim([0,3])
 ###Simulate Spike Train###
 ###Simulate heterogeneous pprocess from dominating homogeneous poisson process by thinning###
 t=0
-lam=[20.0,100.0]; #state rates
+lam=[10.0,200.0]; #state rates
 y_times=Array(Float64,0)
 while(t<=Tobs)
 	u=rand(Uniform(0,1))
@@ -75,16 +75,16 @@ onevec[end]=0;
 priorS0=ones(d+1)/d; #Prior on Zeroeth State S0
 priorS0[end]=0;
 
-niter=1000
+niter=200
 for iter=1:niter
 
 	####Sample States at Observed Times###
 
 	#Backwards Filtering#
-	A[:,:,end]=expm(Gw*(t[end]));
-	for k=n:-1:0
+	A[:,:,O+n+1]=expm(Gw*(t[n+1]));
+	for k=n:-1:1
 		L[:,:,O+k]=diagm(vcat(lam,0));
-		T[:,:,O+k]=expm(Gw*(t[O+k]))
+		T[:,:,O+k]=expm(Gw*(t[k]))
 		A[:,:,O+k]=T[:,:,O+k]*L[:,:,O+k]*A[:,:,O+k+1]
 		uflow[O+k]=maximum(A[:,:,O+k])
 		A[:,:,O+k]/=uflow[O+k]
@@ -134,18 +134,26 @@ for iter=1:niter
 	count(x->x==2,S)
 
 	for i=1:d
-	lam[i]=rand(Gamma(0.001+count(x->x==i,S),1/(0.001+sum(intervals[find(x->x==i,US[1:end-1])]))))
+		lam[i]=rand(Gamma(0.001+count(x->x==i,S),1/(0.001+sum(intervals[find(x->x==i,US[1:end-1])]))))
 	end
 
-	
+	for i=1:d
+		for j=1:d
+			if(j!=i)
+				Q[i,j]=rand(Gamma(1+count(x->x==j,US[find(x->x==i,US[1:end-1])+1]), 1/(1+sum(intervals[find(x->x==i,US[1:end-1])]))))
+			end
 
+		end
+		Q[i,i]=0
+		Q[i,i]=-sum(Q[i,:])
+	end
+	Gw=vcat(hcat(Q-diagm(lam),lam),zeros(d+1)')
 	PyPlot.plot(all_times, US+3, c="red", alpha=0.01)
-
 end
 
 plot([0:0.001:Tobs],map(state,[0:0.001:Tobs])); PyPlot.ylim([-1,7])
-PyPlot.plot(all_times, US, c="red", alpha=0.1)
-PyPlot.plot(y_times,zeros(length(y_times)),c="blue",marker=".",linestyle="None")
+PyPlot.plot(y_times,zeros(length(y_times)),c="blue",marker="|",linestyle="None")
+PyPlot.plot(all_times, US, c="red", marker=".",linestyle="None")
 PyPlot.plot(U_times, 1.5*ones(length(U_times)), c="red", marker=".", linestyle="None")
 PyPlot.plot(y_times, S[1:n], c="red", marker=".", linestyle="None")
 
