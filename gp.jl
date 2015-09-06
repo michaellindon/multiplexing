@@ -1,7 +1,10 @@
 using Distributions
 using PyPlot
 
-srand(4)
+#=GENERATE DATA=#
+srand(7)
+srand(10)
+srand(11)
 
 x= [0:0.1:8]
 nx=length(x)
@@ -14,74 +17,139 @@ for i=1:nx
 	end
 end
 
-L=chol(C+0.0001*eye(nx))'
-
+#=L=chol(C+0.0001*eye(nx))'=#
+Csvd=svd(C)
+L=Csvd[1]*Diagonal(sqrt(Csvd[2]))
 s2=1
 z=rand(Normal(0,1),nx)
 g=sqrt(s2)*L*z
-
+plot(x,g)
 lam_star=100
 intensity=lam_star*cdf(Normal(0,1),g)
 plot(x,intensity)
-
-
-
-
-
-
 intensity1(arg)=intensity[maximum(find( y->(y <= arg), x))]
 
 tobs=8
 lam_dom=lam_star
-n_dom=rand(Poisson(lam_dom*tobs))
-o_dom=sort(rand(Uniform(0,tobs),n_dom))
-o_acc=Array(Float64,0)
-o_thin=Array(Float64,0)
+no=rand(Poisson(lam_dom*tobs))
+o=sort(rand(Uniform(0,tobs),no))
+oacc=Array(Float64,0)
+othin=Array(Float64,0)
 binary=Array(Int64,0)
-for i=1:n_dom
+for i=1:no
 	u=rand(Uniform(0,1))
-	if(u<=intensity1(o_dom[i])/lam_dom)
+	if(u<=intensity1(o[i])/lam_dom)
 		#Accept
-		push!(o_acc,o_dom[i])
+		push!(oacc,o[i])
 		push!(binary,1)
 	else 
 		#Thin
-		push!(o_thin,o_dom[i])
+		push!(othin,o[i])
 		push!(binary,0)
 	end
 end
+na=length(oacc)
 
-PyPlot.plot(o,0.5*ones(length(o)),c="red",marker="|",linestyle="None")
-PyPlot.plot(o_thin,-0.5*ones(length(o_thin)),marker="|",linestyle="None",c="green")
+plot(oacc,0.5*ones(length(oacc)),c="blue",marker="|",linestyle="None",markersize=30)
+#=plot(othin,-0.5*ones(length(othin)),marker="|",linestyle="None",c="green")=#
 
-C=Array(Float64,n_dom,n_dom)
-for i=1:n_dom
-	for j=1:n_dom
-		C[i,j]=rho2*exp(-psi2*(o_dom[i]-o_dom[j])^2)
+C=Array(Float64,no,no)
+for i=1:no
+	for j=1:no
+		C[i,j]=rho2*exp(-psi2*(o[i]-o[j])^2)
 	end
 end
 
-C=C+0.0001*eye(n_dom)
+C=C+0.0001*eye(no)
 L=chol(C)'
-z=rand(Normal(0,1),n_dom)
+z=rand(Normal(0,1),no)
 g=sqrt(s2)*L*z
 
-M=C*inv(eye(n_dom)+C)
+M=C*inv(eye(no)+C)
 L=chol(M)'
 
 
-for iter=1:1000
-
-	Z=Array(Float64,n_dom)
-	for i=1:n_dom
+for iter=1:100
+	Z=Array(Float64,no);
+	for i=1:no
 		if(binary[i]==1)
 			Z[i]=rand(Truncated(Normal(g[i],1), 0, Inf),1)[1]
 		else
 			Z[i]=rand(Truncated(Normal(g[i],1), -Inf, 0),1)[1]
 		end
 	end
-
-	z=rand(Normal(0,1),n_dom)
-	g=M*Z+L*z
-	plot(o_dom,lam_star*cdf(Normal(0,1),g),c="red",alpha=0.1)
+	C=Array(Float64,no,no);
+	for i=1:no
+		for j=1:no
+			C[i,j]=rho2*exp(-psi2*(o[i]-o[j])^2)
+		end
+	end
+	#=C=C+0.0001*eye(no);=#
+	M=C*inv(eye(no)+C);
+	Msvd=svd(M)
+	L=Msvd[1]*Diagonal(sqrt(Msvd[2]))
+	#=L=chol(M)';=#
+	g=M*Z+L*rand(Normal(0,1),no);
+	plot(o,lam_star*cdf(Normal(0,1),g),c="grey",alpha=0.1);
+	n_prop=rand(Poisson(lam_dom*tobs));
+	oprop=sort(rand(Uniform(0,tobs),n_prop));
+	Cpp=Array(Float64,n_prop,n_prop);
+	for i=1:n_prop
+		for j=1:n_prop
+			Cpp[i,j]=rho2*exp(-psi2*(oprop[i]-oprop[j])^2)
+		end
+	end
+	Cpo=Array(Float64,n_prop,no);
+	for i=1:n_prop
+		for j=1:no
+			Cpo[i,j]=rho2*exp(-psi2*(oprop[i]-o[j])^2)
+		end
+	end
+	gprop=Array(Float64,n_prop);
+	gprop=Cpo*\(C,g)+chol(Cpp-Cpo*\(C,Cpo')+0.0001*eye(n_prop))'*rand(Normal(0,1),n_prop);
+	gthin=Array(Float64,0);
+	othin=Array(Float64,0);
+	for i=1:n_prop
+		u=rand(Uniform(0,1))
+		if(u<=lam_star*cdf(Normal(0,1),gprop[i])/lam_dom)
+			#Accept
+		else 
+			#Thin
+			push!(othin,oprop[i])
+			push!(gthin,gprop[i])
+		end
+	end
+	nt=length(othin);
+	no=nt+na;
+	o=Array(Float64,0);
+	gacc=g[find(x->x==1,binary)];
+	g=Array(Float64,0);
+	binary=Array(Int64,0);
+	ai=1;
+	ti=1;
+	while ti<=nt && ai<=na
+		if(othin[ti]<oacc[ai])
+			push!(o,othin[ti])
+			push!(binary,0)
+			push!(g,gthin[ti])
+			ti=ti+1
+		else
+			push!(o,oacc[ai])
+			push!(binary,1)
+			push!(g,gacc[ai])
+			ai=ai+1
+		end
+	end
+	while ti<=nt
+		push!(o,othin[ti])
+		push!(g,gthin[ti])
+		push!(binary,0)
+		ti=ti+1
+	end
+	while ai<=na
+		push!(o,oacc[ai])
+		push!(binary,1)
+		push!(g,gacc[ai])
+		ai=ai+1
+	end
 end
