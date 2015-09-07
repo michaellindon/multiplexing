@@ -10,16 +10,16 @@ x= [0:0.1:8]
 nx=length(x)
 rho2=1
 psi2=0.1
-C=Array(Float64,nx,nx)
+K=Array(Float64,nx,nx)
 for i=1:nx
 	for j=1:nx
-		C[i,j]=rho2*exp(-psi2*(x[i]-x[j])^2)
+		K[i,j]=rho2*exp(-psi2*(x[i]-x[j])^2)
 	end
 end
 
-#=L=chol(C+0.0001*eye(nx))'=#
-Csvd=svd(C)
-L=Csvd[1]*Diagonal(sqrt(Csvd[2]))
+#=L=chol(K+0.0001*eye(nx))'=#
+Ksvd=svd(K)
+L=Ksvd[1]*Diagonal(sqrt(Ksvd[2]))
 s2=1
 z=rand(Normal(0,1),nx)
 g=sqrt(s2)*L*z
@@ -31,125 +31,105 @@ intensity1(arg)=intensity[maximum(find( y->(y <= arg), x))]
 
 T=8
 λ=lam_star
-no=rand(Poisson(λ*T))
-o=sort(rand(Uniform(0,T),no))
-oacc=Array(Float64,0)
-othin=Array(Float64,0)
-binary=Array(Int64,0)
-for i=1:no
+nc=rand(Poisson(λ*T))
+tc=sort(rand(Uniform(0,T),nc))
+m=Array(Bool,nc)
+for i=1:nc
 	u=rand(Uniform(0,1))
-	if(u<=intensity1(o[i])/λ)
+	if(u<=intensity1(tc[i])/λ)
 		#Accept
-		push!(oacc,o[i])
-		push!(binary,1)
+		m[i]=true
 	else 
 		#Thin
-		push!(othin,o[i])
-		push!(binary,0)
+		m[i]=false
 	end
 end
-na=length(oacc)
+to=tc[m]
+tu=tc[!m]
+no=length(to)
+nu=length(tu)
 
-plot(oacc,0.5*ones(length(oacc)),c="blue",marker="|",linestyle="None",markersize=30)
-#=plot(othin,-0.5*ones(length(othin)),marker="|",linestyle="None",c="green")=#
+plot(to,0.5*ones(no),c="blue",marker="|",linestyle="None",markersize=30)
 
-C=Array(Float64,no,no)
-for i=1:no
-	for j=1:no
-		C[i,j]=rho2*exp(-psi2*(o[i]-o[j])^2)
+K=Array(Float64,nc,nc)
+for i=1:nc
+	for j=1:nc
+		K[i,j]=rho2*exp(-psi2*(tc[i]-tc[j])^2)
 	end
 end
 
-C=C+0.0001*eye(no)
-L=chol(C)'
-z=rand(Normal(0,1),no)
+K=K+0.0001*eye(nc)
+L=chol(K)'
+z=rand(Normal(0,1),nc)
 g=sqrt(s2)*L*z
 
-M=C*inv(eye(no)+C)
-L=chol(M)'
-
+#=Prior Specification=#
+ν=1
+λ₀=1
 
 for iter=1:10
-	Z=Array(Float64,no);
-	for i=1:no
-		if(binary[i]==1)
+	Z=Array(Float64,nc);
+	for i=1:nc
+		if(m[i]==1)
 			Z[i]=rand(Truncated(Normal(g[i],1), 0, Inf),1)[1]
 		else
 			Z[i]=rand(Truncated(Normal(g[i],1), -Inf, 0),1)[1]
 		end
 	end
-	C=Array(Float64,no,no);
-	for i=1:no
-		for j=1:no
-			C[i,j]=rho2*exp(-psi2*(o[i]-o[j])^2)
+	K=Array(Float64,nc,nc);
+	for i=1:nc
+		for j=1:nc
+			K[i,j]=rho2*exp(-psi2*(tc[i]-tc[j])^2)
 		end
 	end
-	#=C=C+0.0001*eye(no);=#
-	M=C*inv(eye(no)+C);
-	Msvd=svd(M)
-	L=Msvd[1]*Diagonal(sqrt(Msvd[2]))
-	#=L=chol(M)';=#
-	g=M*Z+L*rand(Normal(0,1),no);
-	plot(o,lam_star*cdf(Normal(0,1),g),c="grey",alpha=0.1);
-	n_prop=rand(Poisson(λ*T));
-	oprop=sort(rand(Uniform(0,T),n_prop));
-	Cpp=Array(Float64,n_prop,n_prop);
-	for i=1:n_prop
-		for j=1:n_prop
-			Cpp[i,j]=rho2*exp(-psi2*(oprop[i]-oprop[j])^2)
+	#=M=K*inv(eye(nc)+K)=#
+	#=Msvd=svd(M)=#
+	#=L=Msvd[1]*Diagonal(sqrt(Msvd[2]))=#
+	V=\(K+eye(nc),K)
+	L=svd(V)
+	L=L[1]*Diagonal(sqrt(L[2]))
+	g=V*Z+L*rand(Normal(0,1),nc);
+	plot(tc,λ*cdf(Normal(0,1),g),c="grey",alpha=0.1);
+	np=rand(Poisson(λ*T));
+	tp=sort(rand(Uniform(0,T),np));
+	Kpp=Array(Float64,np,np);
+	for i=1:np
+		for j=1:np
+			Kpp[i,j]=rho2*exp(-psi2*(tp[i]-tp[j])^2)
 		end
 	end
-	Cpo=Array(Float64,n_prop,no);
-	for i=1:n_prop
-		for j=1:no
-			Cpo[i,j]=rho2*exp(-psi2*(oprop[i]-o[j])^2)
+	Kpc=Array(Float64,np,nc);
+	for i=1:np
+		for j=1:nc
+			Kpc[i,j]=rho2*exp(-psi2*(tp[i]-tc[j])^2)
 		end
 	end
-	gprop=Array(Float64,n_prop);
-	gprop=Cpo*\(C,g)+chol(Cpp-Cpo*\(C,Cpo')+0.0001*eye(n_prop))'*rand(Normal(0,1),n_prop);
-	gthin=Array(Float64,0);
-	othin=Array(Float64,0);
-	for i=1:n_prop
+	gp=Array(Float64,np);
+	#gp=Kpc*\(K,g)+chol(Kpp-Kpc*\(K,Kpc')+0.0001*eye(np))'*rand(Normal(0,1),np);
+	L=svd(Kpp-Kpc*\(K,Kpc'))
+	L=L[1]*Diagonal(sqrt(L[2]))
+	gp=Kpc*\(K,g)+L*rand(Normal(0,1),np);
+	gu=Array(Float64,0);
+	tu=Array(Float64,0);
+	for i=1:np
 		u=rand(Uniform(0,1))
-		if(u<=lam_star*cdf(Normal(0,1),gprop[i])/λ)
+		if(u<=cdf(Normal(0,1),gp[i]))
 			#Accept
 		else 
 			#Thin
-			push!(othin,oprop[i])
-			push!(gthin,gprop[i])
+			push!(tu,tp[i])
+			push!(gu,gp[i])
 		end
 	end
-	nt=length(othin);
-	no=nt+na;
-	o=Array(Float64,0);
-	gacc=g[find(x->x==1,binary)];
-	g=Array(Float64,0);
-	binary=Array(Int64,0);
-	ai=1;
-	ti=1;
-	while ti<=nt && ai<=na
-		if(othin[ti]<oacc[ai])
-			push!(o,othin[ti])
-			push!(binary,0)
-			push!(g,gthin[ti])
-			ti=ti+1
-		else
-			push!(o,oacc[ai])
-			push!(binary,1)
-			push!(g,gacc[ai])
-			ai=ai+1
-		end
-	end
-	while ti<=nt
-		push!(o,othin[ti])
-		push!(g,gthin[ti])
-		push!(binary,0)
-		ti=ti+1
-	end
-	while ai<=na
-		push!(o,oacc[ai])
-		push!(binary,1)
-		push!(g,gacc[ai])
-		ai=ai+1
-	end
+	nu=length(tu);
+	nc=no+nu;
+	go=g[find(m)];
+	tc=[to,tu];
+	g=[go,gu];
+	m=[ones(no),zeros(nu)]
+	indices=sortperm([to,tu])
+	tc=tc[indices]
+	g=g[indices]
+	m=m[indices]
+	λ=rand(Gamma(nc,1/(T)))
 end
