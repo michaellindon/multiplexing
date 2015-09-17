@@ -110,20 +110,20 @@ plot(x,alpha,c="green")
 
 γ=rand(Bernoulli(0.5),nc)
 nc=size(mppp)[1]
-α=zeros(Float64,nc)
+g=zeros(Float64,nc)
 for iter=1:200
-	#=Z=Array(Float64,nc);=#
-	#=for i=1:nc  #m switches depending on the function it came from!=#
-		#=if(mppp[i,2]==0 && mppp[i,4]==1)=#
-			#=Z[i]=rand(Truncated(Normal(α[i],1), 0, Inf),1)[1]=#
-		#=elseif(mppp[i,2]==0 && mppp[i,4]==0)=#
-			#=Z[i]=rand(Truncated(Normal(α[i],1), -Inf, 0),1)[1]=#
-		#=elseif(mppp[i,2]==1 && mppp[i,4]==1)=#
-			#=Z[i]=rand(Truncated(Normal(α[i],1), -Inf, 0),1)[1]=#
-		#=else=#
-			#=Z[i]=rand(Truncated(Normal(α[i],1), 0, Inf),1)[1]=#
-		#=end=#
-	#=end=#
+	Z=Array(Float64,nc);
+	for i=1:nc  #m switches depending on the function it came from!
+		if(mppp[i,2]==0 && mppp[i,4]==1)
+			Z[i]=rand(Truncated(Normal(g[i],1), 0, Inf),1)[1]
+		elseif(mppp[i,2]==0 && mppp[i,4]==0)
+			Z[i]=rand(Truncated(Normal(g[i],1), -Inf, 0),1)[1]
+		elseif(mppp[i,2]==1 && mppp[i,4]==1)
+			Z[i]=rand(Truncated(Normal(g[i],1), -Inf, 0),1)[1]
+		else
+			Z[i]=rand(Truncated(Normal(g[i],1), 0, Inf),1)[1]
+		end
+	end
 	K=Array(Float64,nc,nc);
 	for i=1:nc
 		for j=1:nc
@@ -136,8 +136,8 @@ for iter=1:200
 	V=\(K+eye(nc),K)
 	L=svd(V)
 	L=L[1]*Diagonal(sqrt(L[2]))
-	α=V*mppp[:,6]+L*rand(Normal(0,1),nc);
-	plot(mppp[:,1],cdf(Normal(0,1),α),c="grey",alpha=0.1);
+	g=V*Z+L*rand(Normal(0,1),nc);
+	plot(mppp[:,1],cdf(Normal(0,1),g),c="grey",alpha=0.1);
 	#=np1=rand(Poisson(λc*T));=#
 	#=tp1=sort(rand(Uniform(0,T),np1));=#
 	#=Kpp1=Array(Float64,np1,np1);=#
