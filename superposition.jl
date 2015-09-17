@@ -72,7 +72,7 @@ end
 nc=rand(Poisson(λc*T))
 tc=sort(rand(Uniform(0,T),nc))
 mppp2=Array(Float64,nc,6)
-#Times#Component#λ-thinned#α-thinned
+#Times#Component#λ-thinned#α-thinned#λ-Z#α-Z
 mppp2[:,1]=tc
 mppp2[:,2]=ones(nc)
 for i=1:nc
@@ -110,34 +110,33 @@ plot(x,alpha,c="green")
 
 γ=rand(Bernoulli(0.5),nc)
 nc=size(mppp)[1]
+nα=length(find(mppp[:,3].==1))
 g=zeros(Float64,nc)
 for iter=1:200
-	Z=Array(Float64,nc);
-	for i=1:nc  #m switches depending on the function it came from!
-		if(mppp[i,2]==0 && mppp[i,4]==1)
-			Z[i]=rand(Truncated(Normal(g[i],1), 0, Inf),1)[1]
-		elseif(mppp[i,2]==0 && mppp[i,4]==0)
-			Z[i]=rand(Truncated(Normal(g[i],1), -Inf, 0),1)[1]
-		elseif(mppp[i,2]==1 && mppp[i,4]==1)
-			Z[i]=rand(Truncated(Normal(g[i],1), -Inf, 0),1)[1]
+	ixα=find(mppp[:,3].==1)
+	for ix in ixα  #The λ-thinned events
+		if(mppp[ix,2]==0 && mppp[ix,4]==1)
+			mppp[ix,6]=rand(Truncated(Normal(g[ix],1), 0, Inf),1)[1]
+		elseif(mppp[ix,2]==0 && mppp[ix,4]==0)
+			mppp[ix,6]=rand(Truncated(Normal(g[ix],1), -Inf, 0),1)[1]
+		elseif(mppp[ix,2]==1 && mppp[ix,4]==1)
+			mppp[ix,6]=rand(Truncated(Normal(g[ix],1), -Inf, 0),1)[1]
 		else
-			Z[i]=rand(Truncated(Normal(g[i],1), 0, Inf),1)[1]
+			mppp[ix,6]=rand(Truncated(Normal(g[ix],1), 0, Inf),1)[1]
 		end
 	end
-	K=Array(Float64,nc,nc);
-	for i=1:nc
-		for j=1:nc
-			K[i,j]=rho2*exp(-psi2*(mppp[i,1]-mppp[j,1])^2)
-		end
-	end
-	#=M=K*inv(eye(nc)+K)=#
-	#=Msvd=svd(M)=#
-	#=L=Msvd[1]*Diagonal(sqrt(Msvd[2]))=#
-	V=\(K+eye(nc),K)
-	L=svd(V)
-	L=L[1]*Diagonal(sqrt(L[2]))
-	g=V*Z+L*rand(Normal(0,1),nc);
-	plot(mppp[:,1],cdf(Normal(0,1),g),c="grey",alpha=0.1);
+	nα=length(ixα)
+	#=K=Array(Float64,nα,nα);=#
+	#=for i=1:nα=#
+		#=for j=1:nα=#
+			#=K[i,j]=rho2*exp(-psi2*(mppp[ixα[i],1]-mppp[ixα[j],1])^2)=#
+		#=end=#
+	#=end=#
+	#=V=\(K+eye(nα),K)=#
+	#=L=svd(V)=#
+	#=L=L[1]*Diagonal(sqrt(L[2]))=#
+	g[ixα]=V*mppp[ixα,6]+L*rand(Normal(0,1),nα);
+	plot(mppp[ixα,1],cdf(Normal(0,1),g[ixα]),c="grey",alpha=0.1);
 	#=np1=rand(Poisson(λc*T));=#
 	#=tp1=sort(rand(Uniform(0,T),np1));=#
 	#=Kpp1=Array(Float64,np1,np1);=#
@@ -237,3 +236,5 @@ for iter=1:200
 	#=γ=γ[indices]=#
 	#=λ=rand(Gamma(nc,1/(T)))=#
 end
+
+
