@@ -1,8 +1,8 @@
 using Distributions
 using PyPlot
 
-f₀(x)=sin(2*(4*x-2))+2*exp(-(16^2)*(x-0.5).^2)-1
-f₁(x)=cos(2*(4*x-2))+2*exp(-(3^2)*(x-0.5).^2)-1
+f₀(x)=sin(2*(4*x-2))+2*exp(-(16^2)*(x-0.5).^2)
+f₁(x)=cos(2*(4*x-2))+2*exp(-(3^2)*(x-0.5).^2)
 λc=1000
 λ₀(x)=λc*cdf(Normal(0,1),f₀(x))
 λ₁(x)=λc*cdf(Normal(0,1),f₁(x))
@@ -112,7 +112,7 @@ plot(x,alpha,c="green")
 nc=size(mppp)[1]
 nα=length(find(mppp[:,3].==1))
 g=zeros(Float64,nc)
-for iter=1:200
+for iter=1:2000
 	ixα=find(mppp[:,3].==1)
 	for ix in ixα  #The λ-thinned events
 		if(mppp[ix,2]==0 && mppp[ix,4]==1)
@@ -136,7 +136,12 @@ for iter=1:200
 	#=L=svd(V)=#
 	#=L=L[1]*Diagonal(sqrt(L[2]))=#
 	g[ixα]=V*mppp[ixα,6]+L*rand(Normal(0,1),nα);
-	plot(mppp[ixα,1],cdf(Normal(0,1),g[ixα]),c="grey",alpha=0.1);
+	plot(mppp[ixα,1],cdf(Normal(0,1),g[ixα]),c="grey",alpha=0.01);
+	ixos=find(mppp[:,4].==1)
+	for ix in ixos
+		numerator=cdf(Normal(0,1),g[ix])*λ₀(mppp[ix,1])+(1-cdf(Normal(0,1),g[ix]))*λ₁(mppp[ix,1])
+		mppp[ix,2]=rand(Bernoulli((1-cdf(Normal(0,1),g[ix]))*λ₁(mppp[ix,1])/numerator))
+	end
 	#=np1=rand(Poisson(λc*T));=#
 	#=tp1=sort(rand(Uniform(0,T),np1));=#
 	#=Kpp1=Array(Float64,np1,np1);=#
