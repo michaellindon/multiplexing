@@ -1,118 +1,13 @@
 using Distributions
 using PyPlot
 
-f₀(x)=sin(2*(4*x-2))+2*exp(-(16^2)*(x-0.5).^2)
-f₁(x)=cos(2*(4*x-2))+2*exp(-(3^2)*(x-0.5).^2)
-λc=1000
-λ₀(x)=λc*cdf(Normal(0,1),f₀(x))
-λ₁(x)=λc*cdf(Normal(0,1),f₁(x))
-δ=[0:0.01:1]
-#=plot(δ,f₁(δ),c="blue")=#
-#=plot(δ,f₂(δ),c="blue")=#
-#=plot(δ,λ₁(δ),c="blue")=#
-#=plot(δ,λ₂(δ),c="blue")=#
-#=GENERATE DATA=#
-
-srand(1)
-x=[0:0.01:1]
-nx=length(x)
-rho2=1
-psi2=80
-K=Array(Float64,nx,nx)
-for i=1:nx
-	for j=1:nx
-		K[i,j]=rho2*exp(-psi2*(x[i]-x[j])^2)
-	end
-end
-Ksvd=svd(K)
-L=Ksvd[1]*Diagonal(sqrt(Ksvd[2]))
-s2=1
-z=rand(Normal(0,1),nx)
-g=sqrt(s2)*L*z
-gfun(arg)=g[maximum(find( y->(y <= arg), x))]
-alpha=cdf(Normal(0,1),g)
-#=plot(x,500*alpha)=#
-alphafun(arg)=alpha[maximum(find( y->(y <= arg), x))]
-δ=[0:0.01:1]
-λs=Array(Float64,length(δ))
-for t=1:length(δ)
-	λs[t]=alphafun(δ[t])*λ₀(δ[t])+(1-alphafun(δ[t]))*λ₁(δ[t])
-end
-figure()
-subplot(211)
-plot(δ,λ₀(δ),c="blue",linestyle="--")
-plot(δ,λ₁(δ),c="red",linestyle="--")
-plot(δ,λs,c="purple")
+include("dataGeneration.jl")
 
 
-T=1
-nc=rand(Poisson(λc*T))
-tc=sort(rand(Uniform(0,T),nc))
-mppp0=Array(Float64,nc,7)
-#Times#Component#λ-thinned#α-thinned#λ-Z#α-Z
-mppp0[:,1]=tc
-mppp0[:,2]=zeros(nc)
-for i=1:nc
-	mppp0[i,5]=rand(Normal(f₀(tc[i]),1))
-	if(mppp0[i,5]>0)
-		#Accept
-		mppp0[i,3]=1.0
-		mppp0[i,6]=rand(Normal(gfun(tc[i]),1))
-		if(mppp0[i,6]>0)
-			mppp0[i,4]=1.0
-		else
-			mppp0[i,4]=0.0
-		end
-	else 
-		#Thin
-		mppp0[i,3]=0.0
-		mppp0[i,4]=0.0
-	end
-end
-nc=rand(Poisson(λc*T))
-tc=sort(rand(Uniform(0,T),nc))
-mppp1=Array(Float64,nc,7)
-#Times#Component#λ-thinned#α-thinned#λ-Z#α-Z
-mppp1[:,1]=tc
-mppp1[:,2]=ones(nc)
-for i=1:nc
-	mppp1[i,5]=rand(Normal(f₁(tc[i]),1))
-	if(mppp1[i,5]>0)
-		#Accept
-		mppp1[i,3]=1.0
-		mppp1[i,6]=rand(Normal(gfun(tc[i]),1))
-		if(mppp1[i,6]<0)
-			mppp1[i,4]=1.0
-		else
-			mppp1[i,4]=0.0
-		end
-	else 
-		#Thin
-		mppp1[i,3]=0.0
-		mppp1[i,4]=0.0
-	end
-end
-
-
-mppp=vcat(mppp0,mppp1)
-indices=sortperm(mppp[:,1])
-mppp=mppp[indices,:]
-ix0=find((mppp[:,2].==0.0)&(mppp[:,4].==1.0))
-ix1=find((mppp[:,2].==1.0)&(mppp[:,4].==1.0))
-plot(mppp[ix0,1],-35*ones(length(ix0)),c="blue",marker="|",linestyle="None",markersize=10)
-plot(mppp[ix1,1],-35*ones(length(ix1)),c="red",marker="|",linestyle="None",markersize=10)
-subplot(212)
-plot(x,alpha,c="green")
-
-#=Prior Specification=#
-ν=1
-λ₀=1
-
-γ=rand(Bernoulli(0.5),nc)
 nc=size(mppp)[1]
 nα=length(find(mppp[:,3].==1))
 mppp[:,7]=zeros(Float64,nc)
-for iter=1:200
+for iter=1:20
 	ixα=find(mppp[:,3].==1)
 	for ix in ixα  #The λ-thinned events
 		if(mppp[ix,2]==0 && mppp[ix,4]==1)
@@ -126,15 +21,15 @@ for iter=1:200
 		end
 	end
 	nα=length(ixα)
-	#=K=Array(Float64,nα,nα);=#
-	#=for i=1:nα=#
-		#=for j=1:nα=#
-			#=K[i,j]=rho2*exp(-psi2*(mppp[ixα[i],1]-mppp[ixα[j],1])^2)=#
-		#=end=#
-	#=end=#
-	#=V=\(K+eye(nα),K)=#
-	#=L=svd(V)=#
-	#=L=L[1]*Diagonal(sqrt(L[2]))=#
+	K=Array(Float64,nα,nα);
+	for i=1:nα
+		for j=1:nα
+			K[i,j]=rho2*exp(-psi2*(mppp[ixα[i],1]-mppp[ixα[j],1])^2)
+		end
+	end
+	V=\(K+eye(nα),K)
+	L=svd(V)
+	L=L[1]*Diagonal(sqrt(L[2]))
 	mppp[ixα,7]=V*mppp[ixα,6]+L*rand(Normal(0,1),nα);
 	plot(mppp[ixα,1],cdf(Normal(0,1),mppp[ixα,7]),c="grey",alpha=0.1);
 	ixos=find(mppp[:,4].==1)
@@ -142,92 +37,85 @@ for iter=1:200
 		numerator=cdf(Normal(0,1),mppp[ix,7])*λ₀(mppp[ix,1])+(1-cdf(Normal(0,1),mppp[ix,7]))*λ₁(mppp[ix,1])
 		mppp[ix,2]=rand(Bernoulli((1-cdf(Normal(0,1),mppp[ix,7]))*λ₁(mppp[ix,1])/numerator))
 	end
-	#=mpppos=mppp[ixos,:]=#
-	#=gos=g[ixos]=#
-	#=np0=rand(Poisson(λc*T))=#
-	#=tp0=sort(rand(Uniform(0,T),np0))=#
-	#=mppp0=Array(Float64,np0,6)=#
-	#=#Times#Component#λ-thinned#α-thinned#λ-Z#α-Z=#
-	#=mppp0[:,1]=tp0=#
-	#=mppp0[:,2]=zeros(np0)=#
-	#=Kpp0=Array(Float64,np0,np0);=#
-	#=for i=1:np0=#
-		#=for j=1:np0=#
-			#=Kpp0[i,j]=rho2*exp(-psi2*(mppp0[i,1]-mppp0[j,1])^2)=#
-		#=end=#
-	#=end=#
-	#=Kpc0=Array(Float64,np0,nα);=#
-	#=for i=1:np0=#
-		#=for j=1:nα=#
-			#=Kpc0[i,j]=rho2*exp(-psi2*(mppp0[i,1]-mppp[ixα[j],1])^2)=#
-		#=end=#
-	#=end=#
-	#=gp0=Array(Float64,np0);=#
-	#=L=svd(Kpp0-Kpc0*\(K,Kpc0'))=#
-	#=L=L[1]*Diagonal(sqrt(L[2]))=#
-	#=gp0=Kpc0*\(K,g[ixα])+L*rand(Normal(0,1),np0);=#
-	#=for i=1:np0=#
-		#=mppp0[i,5]=rand(Normal(f₀(tp0[i]),1))=#
-		#=if(mppp0[i,5]>0)=#
-			#=#Accept=#
-			#=mppp0[i,3]=1.0=#
-			#=mppp0[i,6]=rand(Normal(gp0[i],1))=#
-			#=if(mppp0[i,6]>0)=#
-				#=mppp0[i,4]=1.0=#
-			#=else=#
-				#=mppp0[i,4]=0.0=#
-			#=end=#
-		#=else =#
-			#=#Thin=#
-			#=mppp0[i,3]=0.0=#
-			#=mppp0[i,4]=0.0=#
-		#=end=#
-	#=end=#
-	#=np1=rand(Poisson(λc*T))=#
-	#=tp1=sort(rand(Uniform(0,T),np1))=#
-	#=mppp1=Array(Float64,np1,6)=#
-	#=#Times#Component#λ-thinned#α-thinned#λ-Z#α-Z=#
-	#=mppp1[:,1]=tp1=#
-	#=mppp1[:,2]=ones(np1)=#
-	#=Kpp1=Array(Float64,np1,np1);=#
-	#=for i=1:np1=#
-		#=for j=1:np1=#
-			#=Kpp1[i,j]=rho2*exp(-psi2*(mppp1[i,1]-mppp1[j,1])^2)=#
-		#=end=#
-	#=end=#
-	#=Kpc1=Array(Float64,np1,nα);=#
-	#=for i=1:np1=#
-		#=for j=1:nα=#
-			#=Kpc1[i,j]=rho2*exp(-psi2*(mppp1[i,1]-mppp[ixα[j],1])^2)=#
-		#=end=#
-	#=end=#
-	#=gp1=Array(Float64,np1);=#
-	#=L=svd(Kpp1-Kpc1*\(K,Kpc1'))=#
-	#=L=L[1]*Diagonal(sqrt(L[2]))=#
-	#=gp1=Kpc1*\(K,g[ixα])+L*rand(Normal(0,1),np1);=#
-	#=for i=1:np1=#
-		#=mppp1[i,5]=rand(Normal(f₁(tp1[i]),1))=#
-		#=if(mppp1[i,5]>0)=#
-			#=#Accept=#
-			#=mppp1[i,3]=1.0=#
-			#=mppp1[i,6]=rand(Normal(gp1[i],1))=#
-			#=if(mppp1[i,6]<0)=#
-				#=mppp1[i,4]=1.0=#
-			#=else=#
-				#=mppp1[i,4]=0.0=#
-			#=end=#
-		#=else =#
-			#=#Thin=#
-			#=mppp1[i,3]=0.0=#
-			#=mppp1[i,4]=0.0=#
-		#=end=#
-	#=end=#
-	#=g0=gp0[((mppp0[:,3].==1)&(mppp0[:,4].==0))]=#
-	#=g1=gp1[((mppp1[:,3].==1)&(mppp1[:,4].==0))]=#
-	#=mppp=vcat(mpppos,mppp0[((mppp0[:,3].==1)&(mppp0[:,4].==0)),:],mppp1[((mppp1[:,3].==1)&(mppp1[:,4].==0)),:])=#
-	#=g=[gos,g0,g1]=#
-	#=indices=sortperm(mppp[:,1])=#
-	#=mppp=mppp[indices,:]=#
+	np0=rand(Poisson(λc*T))
+	tp0=sort(rand(Uniform(0,T),np0))
+	mppp0=Array(Float64,np0,7)
+	#Times#Component#λ-thinned#α-thinned#λ-Z#α-Z
+	mppp0[:,1]=tp0
+	mppp0[:,2]=zeros(np0)
+	Kpp0=Array(Float64,np0,np0);
+	for i=1:np0
+		for j=1:np0
+			Kpp0[i,j]=rho2*exp(-psi2*(mppp0[i,1]-mppp0[j,1])^2)
+		end
+	end
+	Kpc0=Array(Float64,np0,nα);
+	for i=1:np0
+		for j=1:nα
+			Kpc0[i,j]=rho2*exp(-psi2*(mppp0[i,1]-mppp[ixα[j],1])^2)
+		end
+	end
+	L=svd(Kpp0-Kpc0*\(K,Kpc0'))
+	L=L[1]*Diagonal(sqrt(L[2]))
+	mppp0[:,7]=Kpc0*\(K,mppp[ixα,7])+L*rand(Normal(0,1),np0);
+	for i=1:np0
+		mppp0[i,5]=rand(Normal(f₀(tp0[i]),1))
+		if(mppp0[i,5]>0)
+			#Accept
+			mppp0[i,3]=1.0
+			mppp0[i,6]=rand(Normal(mppp0[i,7],1))
+			if(mppp0[i,6]>0)
+				mppp0[i,4]=1.0
+			else
+				mppp0[i,4]=0.0
+			end
+		else 
+			#Thin
+			mppp0[i,3]=0.0
+			mppp0[i,4]=0.0
+		end
+	end
+	np1=rand(Poisson(λc*T))
+	tp1=sort(rand(Uniform(0,T),np1))
+	mppp1=Array(Float64,np1,7)
+	#Times#Component#λ-thinned#α-thinned#λ-Z#α-Z
+	mppp1[:,1]=tp1
+	mppp1[:,2]=ones(np1)
+	Kpp1=Array(Float64,np1,np1);
+	for i=1:np1
+		for j=1:np1
+			Kpp1[i,j]=rho2*exp(-psi2*(mppp1[i,1]-mppp1[j,1])^2)
+		end
+	end
+	Kpc1=Array(Float64,np1,nα);
+	for i=1:np1
+		for j=1:nα
+			Kpc1[i,j]=rho2*exp(-psi2*(mppp1[i,1]-mppp[ixα[j],1])^2)
+		end
+	end
+	L=svd(Kpp1-Kpc1*\(K,Kpc1'))
+	L=L[1]*Diagonal(sqrt(L[2]))
+	mppp1[:,7]=Kpc1*\(K,mppp[ixα])+L*rand(Normal(0,1),np1);
+	for i=1:np1
+		mppp1[i,5]=rand(Normal(f₁(tp1[i]),1))
+		if(mppp1[i,5]>0)
+			#Accept
+			mppp1[i,3]=1.0
+			mppp1[i,6]=rand(Normal(mppp1[i,7],1))
+			if(mppp1[i,6]<0)
+				mppp1[i,4]=1.0
+			else
+				mppp1[i,4]=0.0
+			end
+		else 
+			#Thin
+			mppp1[i,3]=0.0
+			mppp1[i,4]=0.0
+		end
+	end
+	mppp=vcat(mppp[ixos,:],mppp0[((mppp0[:,3].==1)&(mppp0[:,4].==0)),:],mppp1[((mppp1[:,3].==1)&(mppp1[:,4].==0)),:])
+	indices=sortperm(mppp[:,1])
+	mppp=mppp[indices,:]
 	#=g=g[indices]=#
 	#=np1=rand(Poisson(λc*T));=#
 	#=tp1=sort(rand(Uniform(0,T),np1));=#
