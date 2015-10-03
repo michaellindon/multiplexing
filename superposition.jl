@@ -1,131 +1,92 @@
 using Distributions
-using PyPlot
+#=using PyPlot=#
 using DataFrames
 
 include("dataGeneration.jl")
-plot(x,alpha,c="green")
+include("functions.jl")
+#=plot(x,alpha,c="green")=#
 
-
-nc=size(mppp)[1]
-nα=length(find(mppp[:mf].==1))
-for iter=1:20
-	ixα=find(mppp[:mf].==1)
-	nα=length(ixα)
-	K=Array(Float64,nα,nα);
-	for i=1:nα
-		for j=1:nα
-			K[i,j]=rho2*exp(-psi2*(mppp[ixα[i],:t]-mppp[ixα[j],:t])^2)
-		end
+ξ011=convert(Array,mppp[(mppp[:label].=="011"),[:t,:Zg]])
+ξ011=hcat(ξ011,zeros(size(ξ011,1)))
+ξ111=convert(Array,mppp[(mppp[:label].=="111"),[:t,:Zg]])
+ξ111=hcat(ξ111,ones(size(ξ111,1)))
+ξ=vcat(ξ011,ξ111)
+indices=sortperm(ξ[:,1])
+ξ=ξ[indices,:]
+ξ010=convert(Array,mppp[(mppp[:label].=="010"),[:t,:Zg]])
+ξ110=convert(Array,mppp[(mppp[:label].=="110"),[:t,:Zg]])
+t=convert(Array,mppp[(mppp[:label].=="011")|(mppp[:label].=="111"),:t])
+g=convert(Array,mppp[(mppp[:label].=="011")|(mppp[:label].=="111"),:g])
+tc=convert(Array,mppp[(mppp[:label].=="011")|(mppp[:label].=="111")|(mppp[:label].=="010")|(mppp[:label].=="110"),:t])
+gc=convert(Array,mppp[(mppp[:label].=="011")|(mppp[:label].=="111")|(mppp[:label].=="010")|(mppp[:label].=="110"),:g])
+ξ=hcat(t,convert(Array,mppp[(mppp[:label].=="011")|(mppp[:label].=="111"),:Zg]),ones(length(t)))
+for i=1:size(ξ,1)
+	if((mppp[(mppp[:label].=="011")|(mppp[:label].=="111"),:label])[i]=="011")
+		ξ[i,3]=0
+	else
+		ξ[i,3]=1
 	end
-	V=\(K+eye(nα),K)
-	L=svd(V)
-	L=L[1]*Diagonal(sqrt(L[2]))
-	np=rand(Poisson(λc*T))
-	tp=sort(rand(Uniform(0,T),np))
-	mppp010=DataFrame(t=tp,γ=zeros(Int64,np),mf=zeros(Int64,np),mg=Array(Int64,np),Zf=Array(Float64,np),Zg=Array(Float64,np),label=Array(String,np))
-	Kpp=Array(Float64,np,np);
-	for i=1:np
-		for j=1:np
-			Kpp[i,j]=rho2*exp(-psi2*(mppp010[i,:t]-mppp010[j,:t])^2)
-		end
-	end
-	Kpα=Array(Float64,np,nα);
-	for i=1:np
-		for j=1:nα
-			Kpα[i,j]=rho2*exp(-psi2*(mppp010[i,:t]-mppp[ixα[j],:t])^2)
-		end
-	end
-	Lp=svd(Kpp-Kpα*\(K,Kpα'))
-	Lp=Lp[1]*Diagonal(sqrt(Lp[2]))
-	mppp010[:g]=Kpα*\(K,convert(Array,mppp[ixα,:g]))+Lp*rand(Normal(0,1),np);
-	for i=1:np
-		mppp010[i,:Zf]=rand(Normal(f₀(mppp[i,:t]),1))
-		if(mppp010[i,:Zf]>0)
-			mppp010[i,:mf]=1
-			mppp010[i,:Zg]=rand(Normal(mppp010[i,:g],1))
-			if(mppp010[i,:Zg]>0)
-				mppp010[i,:mg]=1
-				mppp010[i,:label]=string(mppp010[i,:γ],mppp010[i,:mf],mppp010[i,:mg])
-			else
-				mppp010[i,:mg]=0
-				mppp010[i,:label]=string(mppp010[i,:γ],mppp010[i,:mf],mppp010[i,:mg])
-			end
-		else 
-			mppp010[i,:mf]=0
-			mppp010[i,:mg]=NA
-			mppp010[i,:Zg]=NA
-			mppp010[i,:label]=string(mppp010[i,:γ],mppp010[i,:mf],mppp010[i,:mg])
-		end
-	end
-	mppp010=mppp010[mppp010[:label].=="010",:]
-	np=rand(Poisson(λc*T))
-	tp=sort(rand(Uniform(0,T),np))
-	mppp110=DataFrame(t=tp,γ=ones(Int64,np),mf=zeros(Int64,np),mg=Array(Int64,np),Zf=Array(Float64,np),Zg=Array(Float64,np),label=Array(String,np))
-	Kpp=Array(Float64,np,np);
-	for i=1:np
-		for j=1:np
-			Kpp[i,j]=rho2*exp(-psi2*(mppp110[i,:t]-mppp110[j,:t])^2)
-		end
-	end
-	Kpα=Array(Float64,np,nα);
-	for i=1:np
-		for j=1:nα
-			Kpα[i,j]=rho2*exp(-psi2*(mppp110[i,:t]-mppp[ixα[j],:t])^2)
-		end
-	end
-	Lp=svd(Kpp-Kpα*\(K,Kpα'))
-	Lp=Lp[1]*Diagonal(sqrt(Lp[2]))
-	mppp110[:g]=Kpα*\(K,convert(Array,mppp[ixα,:g]))+Lp*rand(Normal(0,1),np);
-	for i=1:np
-		mppp110[i,:Zf]=rand(Normal(f₁(mppp[i,:t]),1))
-		if(mppp110[i,:Zf]>0)
-			mppp110[i,:mf]=1
-			mppp110[i,:Zg]=rand(Normal(mppp110[i,:g],1))
-			if(mppp110[i,:Zg]<0)
-				mppp110[i,:mg]=1
-				mppp110[i,:label]=string(mppp110[i,:γ],mppp110[i,:mf],mppp110[i,:mg])
-			else
-				mppp110[i,:mg]=0
-				mppp110[i,:label]=string(mppp110[i,:γ],mppp110[i,:mf],mppp110[i,:mg])
-			end
-		else 
-			mppp110[i,:mf]=0
-			mppp110[i,:mg]=NA
-			mppp110[i,:Zg]=NA
-			mppp110[i,:label]=string(mppp110[i,:γ],mppp110[i,:mf],mppp110[i,:mg])
-		end
-	end
-	mppp110=mppp110[mppp110[:label].=="110",:]
-	ixos=find((mppp[:label].=="011")|(mppp[:label].=="111"))
-	for ix in ixos
-		numerator=cdf(Normal(0,1),mppp[ix,:g])*λ₀(mppp[ix,:t])+(1-cdf(Normal(0,1),mppp[ix,:g]))*λ₁(mppp[ix,:t])
-		mppp[ix,:γ]=rand(Bernoulli((1-cdf(Normal(0,1),mppp[ix,:g]))*λ₁(mppp[ix,:t])/numerator))
-		if(mppp[ix,:γ]==0)
-			mppp[ix,:Zf]=rand(Truncated(Normal(f₀(mppp[ix,:t]),1), 0, Inf),1)[1]
-			mppp[ix,:Zg]=rand(Truncated(Normal(mppp[ix,:g],1), 0, Inf),1)[1]
-		else
-			mppp[ix,:Zf]=rand(Truncated(Normal(f₁(mppp[ix,:t]),1), 0, Inf),1)[1]
-			mppp[ix,:Zg]=rand(Truncated(Normal(mppp[ix,:g],1), -Inf, 0),1)[1]
-		end
-	end
-	#=mppp=vcat(mppp[ixos,:],mppp010,mppp110)=#
-	mppp=vcat(mppp[ixos,:],mppp[mppp[:label].=="010",:],mppp[mppp[:label].=="110",:])
-	indices=sortperm(mppp[:,:t])
-	mppp=mppp[indices,:]
-	ixα=find(mppp[:mf].==1)
-	nα=length(ixα)
-	K=Array(Float64,nα,nα);
-	for i=1:nα
-		for j=1:nα
-			K[i,j]=rho2*exp(-psi2*(mppp[ixα[i],:t]-mppp[ixα[j],:t])^2)
-		end
-	end
-	V=\(K+eye(nα),K)
-	L=svd(V)
-	L=L[1]*Diagonal(sqrt(L[2]))
-	mppp[ixα,:g]=V*mppp[ixα,:Zg]+L*rand(Normal(0,1),nα);
-	plot(mppp[:t],cdf(Normal(0,1),mppp[:g]),c="grey",alpha=0.1);
-	#=λ=rand(Gamma(nc,1/(T)))=#
 end
 
 
+g=3*ones(length(t))
+gc=3*ones(length(tc))
+niter=2000
+zgTrace=Array(Float64,length(t),niter)
+gTrace=Array(Float64,length(t),niter)
+γTrace=Array(Float64,length(t),niter)
+for iter=1:niter
+	np=rand(Poisson(λc*T))
+	tp=sort(rand(Uniform(0,T),np))
+	ξ010=Array(Float64,0,2)
+	yp,gp=PredictGP(tp,gc,tc,1.0,ρ²,ψ²,"function")
+	for i=1:np
+		if(rand(Bernoulli((1-cdf(Normal(0,1),gp[i]))*λ₀(tp[i])/λc),1)[1]==1)
+			zg=rand(Truncated(Normal(gp[i],1),-Inf,0),1)[1]
+			ξ010=vcat(ξ010,[tp[i],zg]')
+		end
+	end
+	np=rand(Poisson(λc*T))
+	tp=sort(rand(Uniform(0,T),np))
+	ξ110=Array(Float64,0,2)
+	yp,gp=PredictGP(tp,gc,tc,1.0,ρ²,ψ²,"function")
+	for i=1:np
+		if(rand(Bernoulli(cdf(Normal(0,1),gp[i])*λ₁(tp[i])/λc),1)[1]==1)
+			zg=rand(Truncated(Normal(gp[i],1),0,Inf),1)[1]
+			ξ110=vcat(ξ110,[tp[i],zg]')
+		end
+	end
+	for i=1:size(ξ,1)
+		denominator=cdf(Normal(0,1),g[i])*λ₀(t[i])+(1-cdf(Normal(0,1),g[i]))*λ₁(t[i])
+		ξ[i,3]=rand(Bernoulli((1-cdf(Normal(0,1),g[i]))*λ₁(t[i])/denominator))[1]
+		if(ξ[i,3]==1)
+			ξ[i,2]=rand(Truncated(Normal(g[i],1),-Inf,0),1)[1]
+		else
+			ξ[i,2]=rand(Truncated(Normal(g[i],1),0,Inf),1)[1]
+		end
+	end
+	tc=[ξ[:,1],ξ010[:,1],ξ110[:,1]]
+	zgc=[ξ[:,2],ξ010[:,2],ξ110[:,2]]
+	gc=PosteriorGP(zgc,tc,1.0,ρ²,ψ²)
+	g=gc[1:size(ξ,1)]
+	gTrace[:,iter]=g
+	zgTrace[:,iter]=ξ[:,2]
+	γTrace[:,iter]=ξ[:,3]
+	#=indices=sortperm(tc)=#
+	#=tcPlot=tc[indices]=#
+	#=gcPlot=gc[indices]=#
+	#=plot(tcPlot,cdf(Normal(0,1),gcPlot),c="grey",alpha=0.1);=#
+end
+
+tdataStream=open("tjuliaHigh.txt","w")
+gdataStream=open("gjuliaHigh.txt","w")
+gammadataStream=open("gammajuliaHigh.txt","w")
+zgdataStream=open("zgjuliaHigh.txt","w")
+writedlm(tdataStream,t)
+writedlm(gdataStream,gTrace)
+writedlm(zgdataStream,zgTrace)
+writedlm(gammadataStream,γTrace)
+close(tdataStream)
+close(gdataStream)
+close(zgdataStream)
+close(gammadataStream)
