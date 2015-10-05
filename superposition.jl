@@ -34,22 +34,22 @@ zgTrace=Array(Float64,length(t),niter)
 gTrace=Array(Float64,length(t),niter)
 γTrace=Array(Float64,length(t),niter)
 for iter=1:niter
-	np=rand(Poisson(λc*T))
+	np=rand(Poisson(Λ*T))
 	tp=sort(rand(Uniform(0,T),np))
 	ξ010=Array(Float64,0,2)
 	yp,gp=PredictGP(tp,gc,tc,1.0,ρ²,ψ²,"function")
 	for i=1:np
-		if(rand(Bernoulli((1-Φ(gp[i]))*λ₀(tp[i])/λc),1)[1]==1)
+		if(rand(Bernoulli((1-Φ(gp[i]))*λ₀(tp[i])/Λ),1)[1]==1)
 			zg=rand(Truncated(Normal(gp[i],1),-Inf,0),1)[1]
 			ξ010=vcat(ξ010,[tp[i],zg]')
 		end
 	end
-	np=rand(Poisson(λc*T))
+	np=rand(Poisson(Λ*T))
 	tp=sort(rand(Uniform(0,T),np))
 	ξ110=Array(Float64,0,2)
 	yp,gp=PredictGP(tp,gc,tc,1.0,ρ²,ψ²,"function")
 	for i=1:np
-		if(rand(Bernoulli(Φ(gp[i])*λ₁(tp[i])/λc),1)[1]==1)
+		if(rand(Bernoulli(Φ(gp[i])*λ₁(tp[i])/Λ),1)[1]==1)
 			zg=rand(Truncated(Normal(gp[i],1),0,Inf),1)[1]
 			ξ110=vcat(ξ110,[tp[i],zg]')
 		end

@@ -1,8 +1,8 @@
 f₀(x)=sin(2*(4*x-2))+2*exp(-(16^2)*(x-0.5).^2)
 f₁(x)=cos(2*(4*x-2))+2*exp(-(3^2)*(x-0.5).^2)
-λc=2000
-λ₀(x)=λc*cdf(Normal(0,1),f₀(x))
-λ₁(x)=λc*cdf(Normal(0,1),f₁(x))
+Λ=2000
+λ₀(x)=Λ*cdf(Normal(0,1),f₀(x))
+λ₁(x)=Λ*cdf(Normal(0,1),f₁(x))
 δ=[0:0.01:1]
 
 srand(1)
@@ -38,7 +38,7 @@ plot(δ,λs,c="purple")
 
 
 T=1
-nc=rand(Poisson(λc*T))
+nc=rand(Poisson(Λ*T))
 tc=sort(rand(Uniform(0,T),nc))
 #Times#Component#λ-thinned#α-thinned#λ-Z#α-Z
 mppp0=DataFrame(t=tc,γ=zeros(Int64,nc),mf=zeros(Int64,nc),mg=Array(Int64,nc),Zf=Array(Float64,nc),Zg=Array(Float64,nc),label=Array(String,nc),g=Array(Float64,nc))
@@ -82,7 +82,7 @@ if(!all(mppp0[mppp0[:label].=="010",:Zg].<0))
 end
 ##################
 
-nc=rand(Poisson(λc*T))
+nc=rand(Poisson(Λ*T))
 tc=sort(rand(Uniform(0,T),nc))
 #Times#Component#λ-thinned#α-thinned#λ-Z#α-Z
 mppp1=DataFrame(t=tc,γ=ones(Int64,nc),mf=Array(Int64,nc),mg=Array(Int64,nc),Zf=Array(Float64,nc),Zg=Array(Float64,nc),label=Array(String,nc),g=Array(Float64,nc))
