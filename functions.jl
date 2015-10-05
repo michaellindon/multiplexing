@@ -1,3 +1,5 @@
+Φ(x)=cdf(Normal(0,1),x)
+
 function Kernel(x₁,x₂,ρ²,ψ²)
 	K=Array(Float64,size(x₁,1),size(x₂,1))
 	Ψ²=Diagonal(ψ²)

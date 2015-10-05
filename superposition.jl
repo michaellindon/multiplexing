@@ -39,7 +39,7 @@ for iter=1:niter
 	ξ010=Array(Float64,0,2)
 	yp,gp=PredictGP(tp,gc,tc,1.0,ρ²,ψ²,"function")
 	for i=1:np
-		if(rand(Bernoulli((1-cdf(Normal(0,1),gp[i]))*λ₀(tp[i])/λc),1)[1]==1)
+		if(rand(Bernoulli((1-Φ(gp[i]))*λ₀(tp[i])/λc),1)[1]==1)
 			zg=rand(Truncated(Normal(gp[i],1),-Inf,0),1)[1]
 			ξ010=vcat(ξ010,[tp[i],zg]')
 		end
@@ -49,14 +49,14 @@ for iter=1:niter
 	ξ110=Array(Float64,0,2)
 	yp,gp=PredictGP(tp,gc,tc,1.0,ρ²,ψ²,"function")
 	for i=1:np
-		if(rand(Bernoulli(cdf(Normal(0,1),gp[i])*λ₁(tp[i])/λc),1)[1]==1)
+		if(rand(Bernoulli(Φ(gp[i])*λ₁(tp[i])/λc),1)[1]==1)
 			zg=rand(Truncated(Normal(gp[i],1),0,Inf),1)[1]
 			ξ110=vcat(ξ110,[tp[i],zg]')
 		end
 	end
 	for i=1:size(ξ,1)
-		denominator=cdf(Normal(0,1),g[i])*λ₀(t[i])+(1-cdf(Normal(0,1),g[i]))*λ₁(t[i])
-		ξ[i,3]=rand(Bernoulli((1-cdf(Normal(0,1),g[i]))*λ₁(t[i])/denominator))[1]
+		denominator=Φ(g[i])*λ₀(t[i])+(1-Φ(g[i]))*λ₁(t[i])
+		ξ[i,3]=rand(Bernoulli((1-Φ(g[i]))*λ₁(t[i])/denominator))[1]
 		if(ξ[i,3]==1)
 			ξ[i,2]=rand(Truncated(Normal(g[i],1),-Inf,0),1)[1]
 		else
@@ -73,7 +73,7 @@ for iter=1:niter
 	indices=sortperm(tc)
 	tcPlot=tc[indices]
 	gcPlot=gc[indices]
-	plot(tcPlot,cdf(Normal(0,1),gcPlot),c="grey",alpha=0.1);
+	plot(tcPlot,Φ(gcPlot),c="grey",alpha=0.1);
 end
 
 tdataStream=open("tjuliaHigh.txt","w")
