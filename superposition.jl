@@ -29,9 +29,7 @@ for i=1:size(ξ,1)
 end
 
 
-g=3*ones(length(t))
-gc=3*ones(length(tc))
-niter=2000
+niter=40
 zgTrace=Array(Float64,length(t),niter)
 gTrace=Array(Float64,length(t),niter)
 γTrace=Array(Float64,length(t),niter)
@@ -72,10 +70,10 @@ for iter=1:niter
 	gTrace[:,iter]=g
 	zgTrace[:,iter]=ξ[:,2]
 	γTrace[:,iter]=ξ[:,3]
-	#=indices=sortperm(tc)=#
-	#=tcPlot=tc[indices]=#
-	#=gcPlot=gc[indices]=#
-	#=plot(tcPlot,cdf(Normal(0,1),gcPlot),c="grey",alpha=0.1);=#
+	indices=sortperm(tc)
+	tcPlot=tc[indices]
+	gcPlot=gc[indices]
+	plot(tcPlot,cdf(Normal(0,1),gcPlot),c="grey",alpha=0.1);
 end
 
 tdataStream=open("tjuliaHigh.txt","w")

@@ -1,6 +1,6 @@
 f₀(x)=sin(2*(4*x-2))+2*exp(-(16^2)*(x-0.5).^2)
 f₁(x)=cos(2*(4*x-2))+2*exp(-(3^2)*(x-0.5).^2)
-λc=1000
+λc=2000
 λ₀(x)=λc*cdf(Normal(0,1),f₀(x))
 λ₁(x)=λc*cdf(Normal(0,1),f₁(x))
 δ=[0:0.01:1]
@@ -41,8 +41,9 @@ T=1
 nc=rand(Poisson(λc*T))
 tc=sort(rand(Uniform(0,T),nc))
 #Times#Component#λ-thinned#α-thinned#λ-Z#α-Z
-mppp0=DataFrame(t=tc,γ=zeros(Int64,nc),mf=zeros(Int64,nc),mg=Array(Int64,nc),Zf=Array(Float64,nc),Zg=Array(Float64,nc),label=Array(String,nc))
+mppp0=DataFrame(t=tc,γ=zeros(Int64,nc),mf=zeros(Int64,nc),mg=Array(Int64,nc),Zf=Array(Float64,nc),Zg=Array(Float64,nc),label=Array(String,nc),g=Array(Float64,nc))
 for i=1:nc
+	mppp0[i,:g]=gfun(tc[i])
 	mppp0[i,:Zf]=rand(Normal(f₀(tc[i]),1))
 	if(mppp0[i,:Zf]>0)
 		#Accept
@@ -84,8 +85,9 @@ end
 nc=rand(Poisson(λc*T))
 tc=sort(rand(Uniform(0,T),nc))
 #Times#Component#λ-thinned#α-thinned#λ-Z#α-Z
-mppp1=DataFrame(t=tc,γ=ones(Int64,nc),mf=Array(Int64,nc),mg=Array(Int64,nc),Zf=Array(Float64,nc),Zg=Array(Float64,nc),label=Array(String,nc))
+mppp1=DataFrame(t=tc,γ=ones(Int64,nc),mf=Array(Int64,nc),mg=Array(Int64,nc),Zf=Array(Float64,nc),Zg=Array(Float64,nc),label=Array(String,nc),g=Array(Float64,nc))
 for i=1:nc
+	mppp1[i,:g]=gfun(tc[i])
 	mppp1[i,:Zf]=rand(Normal(f₁(tc[i]),1))
 	if(mppp1[i,:Zf]>0)
 		#Accept
@@ -126,12 +128,14 @@ end
 
 
 mppp=vcat(mppp0,mppp1)
-indices=sortperm(mppp[:,:t])
+indices=sortperm(mppp[:t])
 mppp=mppp[indices,:]
 ix0=find((mppp[:,:γ].==0.0)&(mppp[:,:mg].==1.0))
 ix1=find((mppp[:,:γ].==1.0)&(mppp[:,:mg].==1.0))
-mppp[:g]=zeros(Float64,size(mppp,1))
 plot(mppp[ix0,1],-35*ones(length(ix0)),c="blue",marker="|",linestyle="None",markersize=10)
 plot(mppp[ix1,1],-35*ones(length(ix1)),c="red",marker="|",linestyle="None",markersize=10)
 subplot(212)
 plot(x,alpha,c="green")
+ρ²=rho2
+ψ²=Array(Float64,1)
+ψ²[1]=psi2
