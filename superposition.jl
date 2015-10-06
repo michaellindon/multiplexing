@@ -1,9 +1,9 @@
 using Distributions
-#=using PyPlot=#
-using DataFrames
+using PyPlot
 
-include("dataGeneration.jl")
 include("functions.jl")
+#=include("cleandataGeneration.jl")=#
+include("dataGeneration.jl")
 #=plot(x,alpha,c="green")=#
 
 ξ011=convert(Array,mppp[(mppp[:label].=="011"),[:t,:Zg]])
@@ -29,7 +29,7 @@ for i=1:size(ξ,1)
 end
 
 
-niter=40
+niter=10
 zgTrace=Array(Float64,length(t),niter)
 gTrace=Array(Float64,length(t),niter)
 γTrace=Array(Float64,length(t),niter)
@@ -63,8 +63,8 @@ for iter=1:niter
 			ξ[i,2]=rand(Truncated(Normal(g[i],1),0,Inf),1)[1]
 		end
 	end
-	tc=[ξ[:,1],ξ010[:,1],ξ110[:,1]]
-	zgc=[ξ[:,2],ξ010[:,2],ξ110[:,2]]
+	tc=[ξ[:,1];ξ010[:,1];ξ110[:,1]]
+	zgc=[ξ[:,2];ξ010[:,2];ξ110[:,2]]
 	gc=PosteriorGP(zgc,tc,1.0,ρ²,ψ²)
 	g=gc[1:size(ξ,1)]
 	gTrace[:,iter]=g
