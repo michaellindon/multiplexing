@@ -1,6 +1,7 @@
+using DataFrames
 f₀(x)=sin(2*(4*x-2))+2*exp(-(16^2)*(x-0.5).^2)
 f₁(x)=cos(2*(4*x-2))+2*exp(-(3^2)*(x-0.5).^2)
-Λ=2000
+Λ=1000
 λ₀(x)=Λ*cdf(Normal(0,1),f₀(x))
 λ₁(x)=Λ*cdf(Normal(0,1),f₁(x))
 δ=[0:0.01:1]
@@ -9,7 +10,7 @@ srand(1)
 x=[0:0.01:1]
 nx=length(x)
 rho2=1
-psi2=80
+psi2=80.0
 K=Array(Float64,nx,nx)
 for i=1:nx
 	for j=1:nx
@@ -139,3 +140,24 @@ plot(x,alpha,c="green")
 ρ²=rho2
 ψ²=Array(Float64,1)
 ψ²[1]=psi2
+ξ011=convert(Array,mppp[(mppp[:label].=="011"),[:t,:Zg]])
+ξ011=hcat(ξ011,zeros(size(ξ011,1)))
+ξ111=convert(Array,mppp[(mppp[:label].=="111"),[:t,:Zg]])
+ξ111=hcat(ξ111,ones(size(ξ111,1)))
+ξ=vcat(ξ011,ξ111)
+indices=sortperm(ξ[:,1])
+ξ=ξ[indices,:]
+ξ010=convert(Array,mppp[(mppp[:label].=="010"),[:t,:Zg]])
+ξ110=convert(Array,mppp[(mppp[:label].=="110"),[:t,:Zg]])
+t=convert(Array,mppp[(mppp[:label].=="011")|(mppp[:label].=="111"),:t])
+g=convert(Array,mppp[(mppp[:label].=="011")|(mppp[:label].=="111"),:g])
+tc=convert(Array,mppp[(mppp[:label].=="011")|(mppp[:label].=="111")|(mppp[:label].=="010")|(mppp[:label].=="110"),:t])
+gc=convert(Array,mppp[(mppp[:label].=="011")|(mppp[:label].=="111")|(mppp[:label].=="010")|(mppp[:label].=="110"),:g])
+ξ=hcat(t,convert(Array,mppp[(mppp[:label].=="011")|(mppp[:label].=="111"),:Zg]),ones(length(t)))
+for i=1:size(ξ,1)
+	if((mppp[(mppp[:label].=="011")|(mppp[:label].=="111"),:label])[i]=="011")
+		ξ[i,3]=0
+	else
+		ξ[i,3]=1
+	end
+end
