@@ -7,8 +7,23 @@ function realizationGP(x,σ²,ρ²,ψ²)
 	return rand(MvNormal(σ²*K+ϵ*eye(n)))
 end
 
+function logDensityGP(y,x,σ²,ρ²,ψ²)
+	n=size(x,1)
+	Iₒₒ=eye(n)
+	K=Kernel(x,x,ρ²,ψ²)
+	return 	-0.5*n*log(σ²)-0.5*logdet(K+Iₒₒ)-0.5*(1/σ²)*dot(y,\(K+Iₒₒ,y))
+end
+function logDensityGP(xy::Dict,σ²,ρ²,ψ²)
+	x=collect(keys(xy))
+	y=collect(values(xy))
+	return logDensityGP(y,x,σ²,ρ²,ψ²)
+end
+
 function Kernel(x₁,x₂,ρ²,ψ²)
 	K=Array(Float64,size(x₁,1),size(x₂,1))
+	if(typeof(ψ²)==Float64 || typeof(ψ²)==Int64)
+		ψ²=[ψ²]
+	end
 	Ψ²=Diagonal(ψ²)
 	for r=1:size(x₁,1)
 		for c=1:size(x₂,1)
