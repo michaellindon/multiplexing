@@ -33,7 +33,6 @@ type GP
 		end
 		KIY=\(KI,yₒ)
 		logDensity=-0.5*nₒ*log(σ²)-0.5*logdet(KI)-0.5*(1/σ²)*dot(yₒ,KIY)
-		#=logDensity=logpdf(MvNormal(σ²*KI),zeros(nₒ))=#
 		gp = new(xₒ, yₒ, nₒ, σ²,ρ²,ψ²,K,KIY,KI,inputType,logDensity)
 		return gp
 	end
@@ -48,7 +47,6 @@ type GP
 			println("Type of input must be either response or function")
 		end
 		KIY=\(KI,yₒ)
-		#=logDensity=logpdf(MvNormal(σ²*KI),zeros(nₒ))=#
 		logDensity=-0.5*nₒ*log(σ²)-0.5*logdet(KI)-0.5*(1/σ²)*dot(yₒ,KIY)
 		gp = new(xₒ, yₒ, nₒ, σ²,ρ²,ψ²,K,KIY,KI,inputType,logDensity)
 		return gp
