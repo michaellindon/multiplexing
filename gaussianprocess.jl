@@ -27,12 +27,13 @@ type GP
 		if(inputType=="response")
 			KI=PDMat(K+ScalMat(nₒ, 1.0)) #Acquire Idnetity from Response
 		elseif(inputType=="function")
-			KI=PDMat(K+ScalMat(nₒ, 0.000000001))
+			KI=PDMat(K+ScalMat(nₒ, 0.000001))
 		else
 			println("Type of input must be either response or function")
 		end
 		KIY=\(KI,yₒ)
 		logDensity=-0.5*nₒ*log(σ²)-0.5*logdet(KI)-0.5*(1/σ²)*dot(yₒ,KIY)
+		#=logDensity=logpdf(MvNormal(σ²*KI),zeros(nₒ))=#
 		gp = new(xₒ, yₒ, nₒ, σ²,ρ²,ψ²,K,KIY,KI,inputType,logDensity)
 		return gp
 	end
@@ -42,11 +43,12 @@ type GP
 		if(inputType=="response")
 			KI=PDMat(K+ScalMat(nₒ, 1.0)) #Acquire Idnetity from Response
 		elseif(inputType=="function")
-			KI=PDMat(K+ScalMat(nₒ, 0.000000001))
+			KI=PDMat(K+ScalMat(nₒ, 0.000001))
 		else
 			println("Type of input must be either response or function")
 		end
 		KIY=\(KI,yₒ)
+		#=logDensity=logpdf(MvNormal(σ²*KI),zeros(nₒ))=#
 		logDensity=-0.5*nₒ*log(σ²)-0.5*logdet(KI)-0.5*(1/σ²)*dot(yₒ,KIY)
 		gp = new(xₒ, yₒ, nₒ, σ²,ρ²,ψ²,K,KIY,KI,inputType,logDensity)
 		return gp

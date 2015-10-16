@@ -1,17 +1,18 @@
-f₀(x)=sin(2*(4*x-2))+2*exp(-(16^2)*(x-0.5).^2)+2
-f₁(x)=-sin(2*(4*x-2))+2*exp(-(3^2)*(x-0.5).^2)-2
-Λ=1000
+f₀(x)=sin(2*(4*x-2))+2*exp(-(16^2)*(x-0.5).^2)
+f₁(x)=1-sin(2*(4*x-2))+2*exp(-(3^2)*(x-0.5).^2)-2
+Λ=1500
 λ₀(x)=Λ*cdf(Normal(0,1),f₀(x))
 λ₁(x)=Λ*cdf(Normal(0,1),f₁(x))
 
-srand(2)
+srand(4)
 disc=0.01
 Tobs=1
 grid=collect(0:disc:Tobs)
-σ²=1
-ρ²=1
-ψ²=40.0*ones(1)
-g=realizationGP(grid,σ²,ρ²,ψ²)
+σ²=1.0
+ρ²=1.0
+ψ²=40.0
+g=rand(GP(Array(Float64,0),Array(Float64,0),σ²,ρ²,ψ²,"response"),grid)
+g=[g[key] for key in sort(collect(keys(g)))]
 gfun(arg)=g[maximum(find( y->(y <= arg), grid))]
 alpha=Φ(g)
 #=plot(x,500*alpha)=#
@@ -19,10 +20,10 @@ alpha=Φ(g)
 λs(t)=α(t)*λ₀(t)+(1-α(t))*λ₁(t)
 λ₀₁₁(t)=α(t)*λ₀(t)
 Ξ₀₁₁=PPProcess(λ₀₁₁,Λ)
-ξ₀₁₁=realization(Ξ₀₁₁,0,Tobs)
+ξ₀₁₁=rand(Ξ₀₁₁,0,Tobs)
 λ₁₁₁(t)=(1-α(t))*λ₁(t)
 Ξ₁₁₁=PPProcess(λ₁₁₁,Λ)
-ξ₁₁₁=realization(Ξ₁₁₁,0,Tobs)
+ξ₁₁₁=rand(Ξ₁₁₁,0,Tobs)
 figure()
 subplot(211)
 plot(grid,λ₀(grid),c="blue",linestyle="--")
@@ -37,6 +38,7 @@ ylim(0,1)
 
 ξ=Dict{Float64,Dict{UTF8String,Float64}}()
 for t in ξ₀₁₁
+	println(t)
 	ξ[t]=Dict("Zg"=>rand(Truncated(Normal(gfun(t),1),0,Inf)),"γ"=>0)
 end
 for t in ξ₁₁₁
