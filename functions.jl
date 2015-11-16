@@ -19,15 +19,22 @@ function logDensityGP(xy::Dict,σ²,ρ²,ψ²)
 	return logDensityGP(y,x,σ²,ρ²,ψ²)
 end
 
-function Kernel(x₁,x₂,ρ²,ψ²)
-	K=Array(Float64,size(x₁,1),size(x₂,1))
-	if(typeof(ψ²)==Float64 || typeof(ψ²)==Int64)
-		ψ²=[ψ²]
+function Kernel(x::Vector{Float64},ρ²::Float64,ψ²::Float64)
+	K=Array(Float64,length(x),length(x))
+	for r=1:length(x)
+		for c=1:length(x)
+			K[r,c]=ρ²*exp(-ψ²*(x[r]-x[c])*(x[r]-x[c]))
+		end
 	end
-	Ψ²=Diagonal(ψ²)
-	for r=1:size(x₁,1)
-		for c=1:size(x₂,1)
-			K[r,c]=ρ²*exp(-((x₁[r,:]-x₂[c,:])*Ψ²*(x₁[r,:]-x₂[c,:])')[1])
+	ϵ=0.00000000001
+	K=PDMat(K+ScalMat(length(x),ϵ))
+	return(K)
+end
+function Kernel(x₁::Vector{Float64},x₂::Vector{Float64},ρ²,ψ²)
+	K=Array(Float64,length(x₁),length(x₂))
+	for r=1:length(x₁)
+		for c=1:length(x₂)
+			K[r,c]=ρ²*exp(-ψ²*(x₁[r]-x₂[c])*(x₁[r]-x₂[c]))
 		end
 	end
 	return(K)

@@ -1,7 +1,7 @@
 using Distributions
 using PyPlot
 include("transition.jl")
-n=1000
+n=5
 ł=0.1
 p=3
 ν=p+0.5
@@ -22,14 +22,14 @@ H[1,1]=1
 # sylvester(A, B, C) Computes the solution X to the Sylvester equation AX + XB + C = 0
 #=M=Dict(0=>sylvester(F,F',L*q*L'))=#
 # lyap(A, C) Computes the solution X to the continuous Lyapunov equation AX + XA' + C = 0
-m=Dict(0=>zeros(d,1))
-M=Dict(0=>lyap(F,L*q*L'))
+m=Dict(0.0=>zeros(d,1))
+M=Dict(0.0=>lyap(F,L*q*L'))
 t=Dict(zip(collect(0:n),[0;sort(rand(n))]))
 Δ=Dict(zip(collect(1:n),[t[k]-t[k-1] for k=1:n]))
 Q=Dict()
 A=Dict()
 AMAQ=Dict()
-x=Dict(0=>rand(MvNormal(M[0]+0.0000000001(eye(d))),1))
+x=Dict(0.0=>rand(MvNormal(M[0]+0.0000000001(eye(d))),1))
 y=Dict()
 @time for i=1:n
 	#=A=expm(F*Δ[i])=#
@@ -39,30 +39,35 @@ y=Dict()
 	#=x[i]=A[i-1]*x[i-1]+rand(MvNormal(Q[i-1]+0.0000000001(eye(d))))=#
 end
 @time for i=1:n
-	A[i-1]=transition(Δ[i],λ)
-	Q[i-1]=innovation(Δ[i],λ,q)
-	x[i]=A[i-1]*x[i-1]+rand(MvNormal(Q[i-1]+0.0000000001(eye(d))),1)
-	y[i]=H*x[i]+sqrt(σ²)*rand(Normal(0,1))
+	A[t[i-1]]=transition(Δ[i],λ)
+	Q[t[i-1]]=innovation(Δ[i],λ,q)
+	x[t[i]]=A[t[i-1]]*x[t[i-1]]+rand(MvNormal(Q[t[i-1]]+0.0000000001(eye(d))),1)
+	y[t[i]]=H*x[t[i]]+sqrt(σ²)*rand(Normal(0,1))
 end
-plot([x[i][1] for i in sort(collect(keys(x)))],linestyle="None",marker="o")
+plot(sort(collect(keys(x))),[x[i][1] for i in sort(collect(keys(x)))],linestyle="None",marker="o")
 plot([y[i][1] for i in sort(collect(keys(y)))],linestyle="None",marker="o")
-plot([x[i][1] for i in sort(collect(keys(x)))])
+plot(sort(collect(keys(x))),[x[i][1] for i in sort(collect(keys(x)))])
 plot([y[i][1] for i in sort(collect(keys(y)))])
+
+for i=1:1000
+	foo=predictFunction(x,rand(Uniform(0,1),1000),λ,q)
+	plot(sort(collect(keys(foo))),[foo[i][1] for i in sort(collect(keys(foo)))],c="red",alpha=0.1)
+end
 
 
 #Forward Filtering
 @time for i=1:n
-	AMAQ[i-1]=A[i-1]*M[i-1]*A[i-1]'+Q[i-1]
-	#=m[i]=A[i-1]*m[i-1]+AMAQ[i-1]*H'*\(σ²+H*AMAQ[i-1]*H',y[i]-H*A[i-1]*m[i-1])=#
-	#=M[i]=AMAQ[i-1]-AMAQ[i-1]*H'*\(σ²+H*AMAQ[i-1]*H',H*AMAQ[i-1])=#
-	m[i]=A[i-1]*m[i-1]+AMAQ[i-1][:,1]*(y[i]-A[i-1][1,:]*m[i-1])/(σ²+AMAQ[i-1][1,1])
-	M[i]=AMAQ[i-1]-(AMAQ[i-1][:,1]*AMAQ[i-1][1,:])/(σ²+AMAQ[i-1][1,1])
+	AMAQ[t[i-1]]=A[t[i-1]]*M[t[i-1]]*A[t[i-1]]'+Q[t[i-1]]
+	#=m[t[i]]=A[t[i-1]]*m[t[i-1]]+AMAQ[t[i-1]]*H'*\(σ²+H*AMAQ[t[i-1]]*H',y[t[i]]-H*A[t[i-1]]*m[t[i-1]])=#
+	#=M[t[i]]=AMAQ[t[i-1]]-AMAQ[t[i-1]]*H'*\(σ²+H*AMAQ[t[i-1]]*H',H*AMAQ[t[i-1]])=#
+	m[t[i]]=A[t[i-1]]*m[t[i-1]]+AMAQ[t[i-1]][:,1]*(y[t[i]]-A[t[i-1]][1,:]*m[t[i-1]])/(σ²+AMAQ[t[i-1]][1,1])
+	M[t[i]]=AMAQ[t[i-1]]-(AMAQ[t[i-1]][:,1]*AMAQ[t[i-1]][1,:])/(σ²+AMAQ[t[i-1]][1,1])
 end
 
 #Backward Sampling
-x[n]=m[n]+rand(MvNormal(M[n]+0.00000000001*eye(d)),1)
+x[t[n]]=m[t[n]]+rand(MvNormal(M[t[n]]+0.00000000001*eye(d)),1)
 @time for i in reverse(0:n-1)
-	x[i]=m[i]+M[i]*A[i]'*\(AMAQ[i],x[i+1]-A[i]*m[i])+rand(MvNormal(M[i]-M[i]*A[i]'*\(AMAQ[i],A[i]*M[i])+0.000000001(eye(d))))
+	x[t[i]]=m[t[i]]+M[t[i]]*A[t[i]]'*\(AMAQ[t[i]],x[t[i+1]]-A[t[i]]*m[t[i]])+rand(MvNormal(M[t[i]]-M[t[i]]*A[t[i]]'*\(AMAQ[t[i]],A[t[i]]*M[t[i]])+0.000000001(eye(d))))
 end
 plot([x[i][1] for i in sort(collect(keys(x)))])
 

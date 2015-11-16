@@ -1,18 +1,20 @@
 f₀(x)=sin(2*(4*x-2))+2*exp(-(16^2)*(x-0.5).^2)
 f₁(x)=1-sin(2*(4*x-2))+2*exp(-(3^2)*(x-0.5).^2)-2
-Λ=1500
+Λ=2500
 λ₀(x)=Λ*cdf(Normal(0,1),f₀(x))
 λ₁(x)=Λ*cdf(Normal(0,1),f₁(x))
 
-srand(4)
-disc=0.01
+srand(6)
+#=srand(4)=#
+disc=0.0001
 Tobs=1
 grid=collect(0:disc:Tobs)
 σ²=1.0
 ρ²=1.0
-ψ²=40.0
-g=rand(GP(Array(Float64,0),Array(Float64,0),σ²,ρ²,ψ²,"response"),grid)
-g=[g[key] for key in sort(collect(keys(g)))]
+ψ²=20.0
+#=g=rand(GP(Array(Float64,0),Array(Float64,0),σ²,ρ²,ψ²,"response"),grid)=#
+g=chol(Kernel(grid,grid,ρ²,ψ²)+0.000000001*eye(length(grid)))'*rand(Normal(0,1),length(grid))
+#=g=[g[key] for key in sort(collect(keys(g)))]=#
 gfun(arg)=g[maximum(find( y->(y <= arg), grid))]
 alpha=Φ(g)
 #=plot(x,500*alpha)=#
