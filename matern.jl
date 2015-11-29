@@ -1,6 +1,6 @@
 using Distributions
 using PyPlot
-include("transition.jl")
+include("statespace.jl")
 n=5
 ł=0.1
 p=3
@@ -28,7 +28,6 @@ t=Dict(zip(collect(0:n),[0;sort(rand(n))]))
 Δ=Dict(zip(collect(1:n),[t[k]-t[k-1] for k=1:n]))
 Q=Dict()
 A=Dict()
-AMAQ=Dict()
 x=Dict(0.0=>rand(MvNormal(M[0]+0.0000000001(eye(d))),1))
 y=Dict()
 @time for i=1:n
@@ -44,32 +43,52 @@ end
 	x[t[i]]=A[t[i-1]]*x[t[i-1]]+rand(MvNormal(Q[t[i-1]]+0.0000000001(eye(d))),1)
 	y[t[i]]=H*x[t[i]]+sqrt(σ²)*rand(Normal(0,1))
 end
+delete!(x,0.0)
 plot(sort(collect(keys(x))),[x[i][1] for i in sort(collect(keys(x)))],linestyle="None",marker="o")
-plot([y[i][1] for i in sort(collect(keys(y)))],linestyle="None",marker="o")
+plot(sort(collect(keys(y))),[y[i][1] for i in sort(collect(keys(y)))],linestyle="None",marker="o")
 plot(sort(collect(keys(x))),[x[i][1] for i in sort(collect(keys(x)))])
-plot([y[i][1] for i in sort(collect(keys(y)))])
+plot(sort(collect(keys(y))),[y[i][1] for i in sort(collect(keys(y)))])
 
 for i=1:1000
 	foo=predictFunction(x,rand(Uniform(0,1),1000),λ,q)
-	plot(sort(collect(keys(foo))),[foo[i][1] for i in sort(collect(keys(foo)))],c="red",alpha=0.1)
+	plot(sort(collect(keys(foo))),[foo[i][1] for i in sort(collect(keys(foo)))],c="red",alpha=0.01)
 end
 
+for i=1:1000
+	foo=predictFunction(x,rand(Uniform(0,1),1000),λ,q)
+	plot(sort(collect(keys(foo))),[foo[i][1] for i in sort(collect(keys(foo)))],c="red",alpha=0.01)
+end
 
 #Forward Filtering
-@time for i=1:n
-	AMAQ[t[i-1]]=A[t[i-1]]*M[t[i-1]]*A[t[i-1]]'+Q[t[i-1]]
-	#=m[t[i]]=A[t[i-1]]*m[t[i-1]]+AMAQ[t[i-1]]*H'*\(σ²+H*AMAQ[t[i-1]]*H',y[t[i]]-H*A[t[i-1]]*m[t[i-1]])=#
-	#=M[t[i]]=AMAQ[t[i-1]]-AMAQ[t[i-1]]*H'*\(σ²+H*AMAQ[t[i-1]]*H',H*AMAQ[t[i-1]])=#
-	m[t[i]]=A[t[i-1]]*m[t[i-1]]+AMAQ[t[i-1]][:,1]*(y[t[i]]-A[t[i-1]][1,:]*m[t[i-1]])/(σ²+AMAQ[t[i-1]][1,1])
-	M[t[i]]=AMAQ[t[i-1]]-(AMAQ[t[i-1]][:,1]*AMAQ[t[i-1]][1,:])/(σ²+AMAQ[t[i-1]][1,1])
+delete!(t,0.0)
+t=Dict(zip(collect(1:1000),sort([collect(values(t)),rand(995)])))
+t[0]=t[1]-(t[2]-t[1])
+m=Dict(t[0]=>zeros(d,1))
+M=Dict(t[0]=>lyap(F,L*q*L'))
+AMAQ=Dict()
+@time for i=1:(length(t)-1)
+	Δ[i]=t[i]-t[i-1]
+	A[t[i-1]]=transition(Δ[i],λ)
+	Q[t[i-1]]=innovation(Δ[i],λ,q)
+	if(haskey(y,t[i]))
+		AMAQ[t[i-1]]=A[t[i-1]]*M[t[i-1]]*A[t[i-1]]'+Q[t[i-1]]
+		#=m[t[i]]=A[t[i-1]]*m[t[i-1]]+AMAQ[t[i-1]]*H'*\(σ²+H*AMAQ[t[i-1]]*H',y[t[i]]-H*A[t[i-1]]*m[t[i-1]])=#
+		#=M[t[i]]=AMAQ[t[i-1]]-AMAQ[t[i-1]]*H'*\(σ²+H*AMAQ[t[i-1]]*H',H*AMAQ[t[i-1]])=#
+		m[t[i]]=A[t[i-1]]*m[t[i-1]]+AMAQ[t[i-1]][:,1]*(y[t[i]]-A[t[i-1]][1,:]*m[t[i-1]])/(σ²+AMAQ[t[i-1]][1,1])
+		M[t[i]]=AMAQ[t[i-1]]-(AMAQ[t[i-1]][:,1]*AMAQ[t[i-1]][1,:])/(σ²+AMAQ[t[i-1]][1,1])
+	else
+		AMAQ[t[i-1]]=A[t[i-1]]*M[t[i-1]]*A[t[i-1]]'+Q[t[i-1]]
+		m[t[i]]=A[t[i-1]]*m[t[i-1]]
+		M[t[i]]=A[t[i-1]]*M[t[i-1]]*A[t[i-1]]'+Q[t[i-1]]
+	end
 end
 
 #Backward Sampling
 x[t[n]]=m[t[n]]+rand(MvNormal(M[t[n]]+0.00000000001*eye(d)),1)
-@time for i in reverse(0:n-1)
+for i=(n-1):-1:0
 	x[t[i]]=m[t[i]]+M[t[i]]*A[t[i]]'*\(AMAQ[t[i]],x[t[i+1]]-A[t[i]]*m[t[i]])+rand(MvNormal(M[t[i]]-M[t[i]]*A[t[i]]'*\(AMAQ[t[i]],A[t[i]]*M[t[i]])+0.000000001(eye(d))))
 end
-plot([x[i][1] for i in sort(collect(keys(x)))])
+plot(sort(collect(keys(x))),[x[i][1] for i in sort(collect(keys(x)))])
 
 
 
@@ -101,3 +120,25 @@ matshow(inv(V[H.==1,H.==1]))
 
 g=chol(Kernel(sort(collect(values(t))),sort(collect(values(t))),1.0,1.0)+0.000000001*eye(length(sort(collect(values(t))))))'*rand(Normal(0,1),length(sort(collect(values(t)))))
 plot(g)
+
+
+
+for iiiiii=1:100
+	x=FFBS(y,rand(1000),σ²,λ,q)
+	plot(sort(collect(keys(x))),[x[i][1] for i in sort(collect(keys(x)))],c="red",alpha=0.1)
+end
+
+xₒ=Array{Float64}(collect(keys(y)))
+output=Array{Float64}([y[key][1] for key in collect(keys(y))])
+xₚ=sort(rand(1000))
+ρ²=1.0
+ψ²=0.5
+Kₒₒ=Kernel(xₒ,xₒ,ρ²,ψ²)
+Kₚₚ=Kernel(xₚ,xₚ,ρ²,ψ²)
+Kₚₒ=Kernel(xₚ,xₒ,ρ²,ψ²)
+L=chol(Kₚₚ-Kₚₒ*\(Kₒₒ+0.0000000000001*eye(length(output)),Kₚₒ')+0.00000000000001*eye(length(xₚ)))'
+for iiii=1:100
+	onehalf=Kₚₒ*\(Kₒₒ+0.00000000001*eye(length(output)),output)+L*rand(Normal(0,1),length(xₚ))
+	plot(xₚ,onehalf,c="blue",alpha=0.1)
+end
+plot(xₒ,output,linestyle="None",marker="o")
