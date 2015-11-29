@@ -1,3 +1,14 @@
+signM=[1.0 ; -1.0  ; 1.0 ; -1.0]
+signM=signM*signM'
+
+function statcov(λ,q)
+	M=[[(5*q)/(32*λ^7)	,0	,-(q/(32*λ^5))	,0]';
+	[0,	q/(32*λ^5),	0,	-(q/(32*λ^3))]';
+	[-(q/(32*λ^5)),	0,	q/(32*λ^3),	0]';
+	[0,	-(q/(32*λ^3)),	0,	(5*q)/(32*λ)]']
+	return(M)
+end
+
 function innovation(Δ,λ,q)
 	em2Δλ=exp(-2*Δ*λ)
 	e2Δλ=exp(2*Δ*λ)
@@ -45,47 +56,50 @@ function transition(Δ,λ)
 	return Φ
 end
 
-function predictFunction(xInput::Dict,tOutput::Array{Float64},λ,q)
+#Appears FFBS2 faster than this one
+function predictFunction(xInput::Dict,t::Array{Float64},λ,q)
 	x=copy(xInput)
-	times=sort([collect(keys(x));tOutput])
-	if(!haskey(x,times[end])) #if x does not have key i.e. unobserved
-		prevo=length(times) #Go backwards in time to find latest observed time
-		while(!haskey(x,times[prevo])) #while x does not have key
+	t=sort(union(keys(x),t))
+	n=length(t)
+	if(!haskey(x,t[end])) #if x does not have key i.e. unobserved
+		prevo=length(t) #Go backwards in time to find latest observed time
+		while(!haskey(x,t[prevo])) #while x does not have key
 			prevo=prevo-1 #go back
 		end #exit when x has the key, this is the latest observed time before the current unobserved time
-		Ap=transition(times[end]-times[prevo],λ)
-		Qp=innovation(times[end]-times[prevo],λ,q)
-		x[times[end]]=Ap*x[times[prevo]]+rand(MvNormal(Qp+0.0000000001(eye(d))),1)
+		Ap=transition(t[end]-t[prevo],λ)
+		Qp=innovation(t[end]-t[prevo],λ,q)
+		x[t[end]]=Ap*x[t[prevo]]+rand(MvNormal(Qp+0.0000000001(eye(d))),1)
 	end
-	for i=length(times-1):-1:1
-		if(!haskey(x,times[i])) #if x does not have key i.e. unobserved
+	for i=(n-1):-1:1
+		if(!haskey(x,t[i])) #if x does not have key i.e. unobserved
 			prevo=i #Go backwards in time to find latest observed time
-			while(!haskey(x,times[prevo])) #while x does not have key
+			while(!haskey(x,t[prevo])) #while x does not have key
 				prevo=prevo-1 #go back
 				if(prevo==0)
 					break
 				end
 			end #exit when x has the key, this is the latest observed time before the current unobserved time
 			if(prevo!=0)
-				Ap=transition(times[i]-times[prevo],λ)
-				Qp=innovation(times[i]-times[prevo],λ,q)
-				An=transition(times[i+1]-times[i],λ)
-				Qn=innovation(times[i+1]-times[i],λ,q)
-				x[times[i]]=Ap*x[times[prevo]]+Qp*An'*\(An*Qp*An'+Qn+0.0000001*eye(d),x[times[i+1]]-An*Ap*x[times[prevo]])+rand(MvNormal(Qp-Qp*An'*\(An*Qp*An'+Qn+0.00000001*eye(d),An*Qp)+0.000001*eye(d)))
+				Ap=transition(t[i]-t[prevo],λ)
+				Qp=innovation(t[i]-t[prevo],λ,q)
+				An=transition(t[i+1]-t[i],λ)
+				Qn=innovation(t[i+1]-t[i],λ,q)
+				x[t[i]]=Ap*x[t[prevo]]+Qp*An'*\(An*Qp*An'+Qn+0.0000001*eye(d),x[t[i+1]]-An*Ap*x[t[prevo]])+rand(MvNormal(Qp-Qp*An'*\(An*Qp*An'+Qn+0.00000001*eye(d),An*Qp)+0.000001*eye(d)))
 			else
-				An=transition(times[i+1]-times[i],λ)
-				Qn=innovation(times[i+1]-times[i],λ,q)
-				x[times[i]]=(signM.*An)*x[times[i+1]]+rand(MvNormal((signM.*Qn)+0.0000000001*eye(d)))
+				An=transition(t[i+1]-t[i],λ)
+				Qn=innovation(t[i+1]-t[i],λ,q)
+				x[t[i]]=(signM.*An)*x[t[i+1]]+rand(MvNormal((signM.*Qn)+0.0000000001*eye(d)))
 			end
 		end
 	end
 	return(x)
 end
 
-function FFBS(y::Dict,σ²,λ,q)
-	n=length(y)
-	t=Dict(zip(collect(0:n),[0.0,sort(collect(keys(y)))]))
-	x=Dict()
+function FFBS(y::Dict,t,σ²,λ,q)
+	n=length(t)
+	t=union(keys(y),t)
+	t=Dict(zip(collect(1:n),sort(t)))
+	t[0]=t[1]-(t[2]-t[1])
 	bline=reverse([λ^i for i=1:(p+1)])
 	for i=1:(p+1)
 		bline[i]=bline[i]*binomial(p+1,i-1)
@@ -95,23 +109,77 @@ function FFBS(y::Dict,σ²,λ,q)
 	d=p+1
 	L=zeros(d,1)
 	L[d,1]=1
-	m=Dict(0.0=>zeros(d,1))
-	M=Dict(0.0=>lyap(F,L*q*L'))
+	m=Dict(t[0]=>zeros(d,1))
+	M=Dict(t[0]=>lyap(F,L*q*L'))
 	AMAQ=Dict()
 	for i=1:n
+		Δ[i]=t[i]-t[i-1]
 		A[t[i-1]]=transition(Δ[i],λ)
 		Q[t[i-1]]=innovation(Δ[i],λ,q)
+		if(haskey(y,t[i]))
+			AMAQ[t[i-1]]=A[t[i-1]]*M[t[i-1]]*A[t[i-1]]'+Q[t[i-1]]
+			m[t[i]]=A[t[i-1]]*m[t[i-1]]+AMAQ[t[i-1]][:,1]*(y[t[i]]-A[t[i-1]][1,:]*m[t[i-1]])/(σ²+AMAQ[t[i-1]][1,1])
+			M[t[i]]=AMAQ[t[i-1]]-(AMAQ[t[i-1]][:,1]*AMAQ[t[i-1]][1,:])/(σ²+AMAQ[t[i-1]][1,1])
+		else
+			AMAQ[t[i-1]]=A[t[i-1]]*M[t[i-1]]*A[t[i-1]]'+Q[t[i-1]]
+			m[t[i]]=A[t[i-1]]*m[t[i-1]]
+			M[t[i]]=AMAQ[t[i-1]]
+		end
 	end
-	#Forward Filtering
-	for i=1:n
-		AMAQ[t[i-1]]=A[t[i-1]]*M[t[i-1]]*A[t[i-1]]'+Q[t[i-1]]
-		m[t[i]]=A[t[i-1]]*m[t[i-1]]+AMAQ[t[i-1]][:,1]*(y[t[i]]-A[t[i-1]][1,:]*m[t[i-1]])/(σ²+AMAQ[t[i-1]][1,1])
-		M[t[i]]=AMAQ[t[i-1]]-(AMAQ[t[i-1]][:,1]*AMAQ[t[i-1]][1,:])/(σ²+AMAQ[t[i-1]][1,1])
-	end
+	x=Dict()
 	#Backward Sampling
 	x[t[n]]=m[t[n]]+rand(MvNormal(M[t[n]]+0.00000000001*eye(d)),1)
-	for i in reverse(0:n-1)
+	for i=(n-1):-1:0
 		x[t[i]]=m[t[i]]+M[t[i]]*A[t[i]]'*\(AMAQ[t[i]],x[t[i+1]]-A[t[i]]*m[t[i]])+rand(MvNormal(M[t[i]]-M[t[i]]*A[t[i]]'*\(AMAQ[t[i]],A[t[i]]*M[t[i]])+0.000000001(eye(d))))
+	end
+	return(x);
+end
+
+function FFBS2(y::Dict,t,λ,q)
+	σ²=0.000000000000001
+	n=length(t)
+	t=union(keys(y),t)
+	t=Dict(zip(collect(1:n),sort(t)))
+	t[0]=t[1]-(t[2]-t[1])
+	bline=reverse([λ^i for i=1:(p+1)])
+	for i=1:(p+1)
+		bline[i]=bline[i]*binomial(p+1,i-1)
+	end
+	F=vcat(hcat(zeros(p),eye(p)),-bline')
+	F=convert(Array{Float64,2},F)
+	d=p+1
+	L=zeros(d,1)
+	L[d,1]=1
+	m=Dict(t[0]=>zeros(d,1))
+	M=Dict(t[0]=>lyap(F,L*q*L'))
+	AMAQ=Dict()
+	for i=1:n
+		Δ[i]=t[i]-t[i-1]
+		A[t[i-1]]=transition(Δ[i],λ)
+		Q[t[i-1]]=innovation(Δ[i],λ,q)
+		if(haskey(y,t[i]))
+			AMAQ[t[i-1]]=A[t[i-1]]*M[t[i-1]]*A[t[i-1]]'+Q[t[i-1]]
+			m[t[i]]=y[t[i]]
+			M[t[i]]=zeros(d,d)
+		else
+			AMAQ[t[i-1]]=A[t[i-1]]*M[t[i-1]]*A[t[i-1]]'+Q[t[i-1]]
+			m[t[i]]=A[t[i-1]]*m[t[i-1]]
+			M[t[i]]=AMAQ[t[i-1]]
+		end
+	end
+	x=Dict()
+	#Backward Sampling
+	if(!haskey(y,t[n]))
+		x[t[n]]=m[t[n]]+rand(MvNormal(M[t[n]]+0.000001*eye(d)),1)
+	else
+		x[t[n]]=y[t[n]]
+	end
+	for i=(n-1):-1:0
+		if(!haskey(y,t[i]))
+			x[t[i]]=m[t[i]]+M[t[i]]*A[t[i]]'*\(AMAQ[t[i]]+0.00001*eye(d),x[t[i+1]]-A[t[i]]*m[t[i]])+rand(MvNormal(M[t[i]]-M[t[i]]*A[t[i]]'*\(AMAQ[t[i]]+0.00001*eye(d),A[t[i]]*M[t[i]])+0.00001(eye(d))))
+		else
+			x[t[i]]=y[t[i]]
+		end
 	end
 	return(x);
 end
