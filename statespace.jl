@@ -100,7 +100,7 @@ function predictFunction(xInput::Dict,tkeep,λ,q)
 	return(x)
 end
 
-function FFBS(y::Dict,tkeep,σ²,λ,q)
+function FFBS(y::Dict,tkeep,μ,σ²,λ,q)
 	t=union(keys(y),tkeep)
 	n=length(t)
 	t=Dict(zip(collect(1:n),sort(t)))
@@ -120,7 +120,7 @@ function FFBS(y::Dict,tkeep,σ²,λ,q)
 		Q[t[i-1]]=innovation(Δ[i],λ,q)
 		if(haskey(y,t[i]))
 			AMAQ[t[i-1]]=A[t[i-1]]*M[t[i-1]]*A[t[i-1]]'+Q[t[i-1]]
-			m[t[i]]=A[t[i-1]]*m[t[i-1]]+AMAQ[t[i-1]][:,1]*(y[t[i]]-A[t[i-1]][1,:]*m[t[i-1]])/(σ²+AMAQ[t[i-1]][1,1])
+			m[t[i]]=A[t[i-1]]*m[t[i-1]]+AMAQ[t[i-1]][:,1]*(y[t[i]]-μ-A[t[i-1]][1,:]*m[t[i-1]])/(σ²+AMAQ[t[i-1]][1,1])
 			M[t[i]]=AMAQ[t[i-1]]-(AMAQ[t[i-1]][:,1]*AMAQ[t[i-1]][1,:])/(σ²+AMAQ[t[i-1]][1,1])
 		else
 			AMAQ[t[i-1]]=A[t[i-1]]*M[t[i-1]]*A[t[i-1]]'+Q[t[i-1]]
@@ -194,7 +194,7 @@ function FFBS2(y::Dict,tkeep,λ,q)
 end
 
 
-function sslogdensity(y,λ,q)
+function sslogdensity(y,μ,λ,q)
 	if(λ<0)
 		return(-Inf)
 	end
@@ -202,7 +202,7 @@ function sslogdensity(y,λ,q)
 		return(-Inf)
 	end
 	n=length(y)
-	t=Dict(zip(1:n,sort(collect(keys(Zgc)))))
+	t=Dict(zip(1:n,sort(collect(keys(y)))))
 	t[0]=t[1]-(t[2]-t[1])
 	m=Dict(t[0]=>zeros(d,1))
 	M=Dict(t[0]=>statcov(λ,q))
@@ -215,12 +215,12 @@ function sslogdensity(y,λ,q)
 		A[t[i-1]]=transition(Δ[i],λ)
 		Q[t[i-1]]=innovation(Δ[i],λ,q)
 		AMAQ[t[i-1]]=A[t[i-1]]*M[t[i-1]]*A[t[i-1]]'+Q[t[i-1]]
-		m[t[i]]=A[t[i-1]]*m[t[i-1]]+AMAQ[t[i-1]][:,1]*(y[t[i]]-A[t[i-1]][1,:]*m[t[i-1]])/(σ²+AMAQ[t[i-1]][1,1])
+		m[t[i]]=A[t[i-1]]*m[t[i-1]]+AMAQ[t[i-1]][:,1]*(y[t[i]]-μ-A[t[i-1]][1,:]*m[t[i-1]])/(σ²+AMAQ[t[i-1]][1,1])
 		M[t[i]]=AMAQ[t[i-1]]-(AMAQ[t[i-1]][:,1]*AMAQ[t[i-1]][1,:])/(σ²+AMAQ[t[i-1]][1,1])
 	end
 	logdensity=0
 	for i=1:n
-		logdensity=logdensity+logpdf(Normal((A[t[i-1]][1,:]*m[t[i-1]])[1],sqrt(σ²+AMAQ[t[i-1]][1,1])),Zgc[t[i]])
+		logdensity=logdensity+logpdf(Normal(μ+(A[t[i-1]][1,:]*m[t[i-1]])[1],sqrt(σ²+AMAQ[t[i-1]][1,1])),y[t[i]])
 	end
 	return(logdensity)
 end
