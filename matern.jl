@@ -8,35 +8,19 @@ p=3
 λ=sqrt(2*ν)/ł
 σ²=1.0
 q=2*σ²*√π*λ^(2*p+1)*gamma(p+1)/gamma(p+0.5)
-bline=reverse([λ^i for i=1:(p+1)])
-for i=1:(p+1)
-	bline[i]=bline[i]*binomial(p+1,i-1)
-end
-F=vcat(hcat(zeros(p),eye(p)),-bline')
-F=convert(Array{Float64,2},F)
 d=p+1
 L=zeros(d,1)
 L[d,1]=1
 H=zeros(1,d)
 H[1,1]=1
-# sylvester(A, B, C) Computes the solution X to the Sylvester equation AX + XB + C = 0
-#=M=Dict(0=>sylvester(F,F',L*q*L'))=#
-# lyap(A, C) Computes the solution X to the continuous Lyapunov equation AX + XA' + C = 0
 m=Dict(0.0=>zeros(d,1))
-M=Dict(0.0=>lyap(F,L*q*L'))
+M=Dict(0.0=>statcov(λ,q))
 t=Dict(zip(collect(0:n),[0;sort(rand(n))]))
 Δ=Dict(zip(collect(1:n),[t[k]-t[k-1] for k=1:n]))
 Q=Dict()
 A=Dict()
 x=Dict(0.0=>rand(MvNormal(M[0]+0.0000000001(eye(d))),1))
 y=Dict()
-@time for i=1:n
-	#=A=expm(F*Δ[i])=#
-	H=expm(Δ[i]*vcat(hcat(-F,L*q*L'),hcat(zeros(d,d),F')))
-	A[i-1]=H[d+1:end,d+1:end]'
-	Q[i-1]=A[i-1]*H[1:d,d+1:end]
-	#=x[i]=A[i-1]*x[i-1]+rand(MvNormal(Q[i-1]+0.0000000001(eye(d))))=#
-end
 @time for i=1:n
 	A[t[i-1]]=transition(Δ[i],λ)
 	Q[t[i-1]]=innovation(Δ[i],λ,q)
@@ -49,14 +33,14 @@ plot(sort(collect(keys(y))),[y[i][1] for i in sort(collect(keys(y)))],linestyle=
 plot(sort(collect(keys(x))),[x[i][1] for i in sort(collect(keys(x)))])
 plot(sort(collect(keys(y))),[y[i][1] for i in sort(collect(keys(y)))])
 
-for i=1:1000
+@time for i=1:100
 	foo=predictFunction(x,rand(Uniform(0,1),1000),λ,q)
-	plot(sort(collect(keys(foo))),[foo[i][1] for i in sort(collect(keys(foo)))],c="red",alpha=0.01)
+	plot(sort(collect(keys(foo))),[foo[i][1] for i in sort(collect(keys(foo)))],c="blue",alpha=0.1)
 end
 
-for i=1:1000
+for i=1:100
 	foo=predictFunction(x,rand(Uniform(0,1),1000),λ,q)
-	plot(sort(collect(keys(foo))),[foo[i][1] for i in sort(collect(keys(foo)))],c="red",alpha=0.01)
+	plot(sort(collect(keys(foo))),[foo[i][1] for i in sort(collect(keys(foo)))],c="blue",alpha=0.1)
 end
 
 #Forward Filtering
@@ -125,6 +109,11 @@ plot(g)
 
 for iiiiii=1:100
 	x=FFBS(y,rand(1000),σ²,λ,q)
+	plot(sort(collect(keys(x))),[x[i][1] for i in sort(collect(keys(x)))],c="red",alpha=0.1)
+end
+@time for iiiiii=1:100
+	foo=copy(xcopy)
+	x=FFBS2(foo,rand(1000),λ,q)
 	plot(sort(collect(keys(x))),[x[i][1] for i in sort(collect(keys(x)))],c="red",alpha=0.1)
 end
 

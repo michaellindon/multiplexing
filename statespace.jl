@@ -88,7 +88,7 @@ function predictFunction(xInput::Dict,tkeep,λ,q)
 			else
 				An=transition(t[i+1]-t[i],λ)
 				Qn=innovation(t[i+1]-t[i],λ,q)
-				x[t[i]]=(signM.*An)*x[t[i+1]]+rand(MvNormal((signM.*Qn)+0.0000000001*eye(d)))
+				x[t[i]]=(signM.*An)*x[t[i+1]]+rand(MvNormal((signM.*Qn)+0.0001*eye(d)))
 			end
 		end
 	end
@@ -100,7 +100,7 @@ function predictFunction(xInput::Dict,tkeep,λ,q)
 	return(x)
 end
 
-function FFBS(y::Dict,tkeep,μ,σ²,λ,q)
+function FFBS(y::Dict,tkeep,μ,β,σ²,λ,q)
 	t=union(keys(y),tkeep)
 	n=length(t)
 	t=Dict(zip(collect(1:n),sort(t)))
@@ -120,8 +120,8 @@ function FFBS(y::Dict,tkeep,μ,σ²,λ,q)
 		Q[t[i-1]]=innovation(Δ[i],λ,q)
 		if(haskey(y,t[i]))
 			AMAQ[t[i-1]]=A[t[i-1]]*M[t[i-1]]*A[t[i-1]]'+Q[t[i-1]]
-			m[t[i]]=A[t[i-1]]*m[t[i-1]]+AMAQ[t[i-1]][:,1]*(y[t[i]]-μ-A[t[i-1]][1,:]*m[t[i-1]])/(σ²+AMAQ[t[i-1]][1,1])
-			M[t[i]]=AMAQ[t[i-1]]-(AMAQ[t[i-1]][:,1]*AMAQ[t[i-1]][1,:])/(σ²+AMAQ[t[i-1]][1,1])
+			m[t[i]]=A[t[i-1]]*m[t[i-1]]+β*AMAQ[t[i-1]][:,1]*(y[t[i]]-μ-β*A[t[i-1]][1,:]*m[t[i-1]])/(σ²+β*AMAQ[t[i-1]][1,1]*β)
+			M[t[i]]=AMAQ[t[i-1]]-β*(AMAQ[t[i-1]][:,1]*AMAQ[t[i-1]][1,:])*β/(σ²+β*AMAQ[t[i-1]][1,1]*β)
 		else
 			AMAQ[t[i-1]]=A[t[i-1]]*M[t[i-1]]*A[t[i-1]]'+Q[t[i-1]]
 			m[t[i]]=A[t[i-1]]*m[t[i-1]]
@@ -132,14 +132,18 @@ function FFBS(y::Dict,tkeep,μ,σ²,λ,q)
 	#Backward Sampling
 	x[t[n]]=m[t[n]]+rand(MvNormal(M[t[n]]+0.00000000001*eye(d)),1)
 	for i=(n-1):-1:0
-		x[t[i]]=m[t[i]]+M[t[i]]*A[t[i]]'*\(AMAQ[t[i]],x[t[i+1]]-A[t[i]]*m[t[i]])+rand(MvNormal(M[t[i]]-M[t[i]]*A[t[i]]'*\(AMAQ[t[i]],A[t[i]]*M[t[i]])+0.000000001(eye(d))))
+		x[t[i]]=m[t[i]]+M[t[i]]*A[t[i]]'*\(AMAQ[t[i]],x[t[i+1]]-A[t[i]]*m[t[i]])+rand(MvNormal(M[t[i]]-M[t[i]]*A[t[i]]'*\(AMAQ[t[i]],A[t[i]]*M[t[i]])+0.0001(eye(d))))
 	end
-	for key in keys(x)
-		if(!(key in tkeep))
-			delete!(x,key)
-		end
+	#=for key in keys(x)=#slow
+		#=if(!(key in tkeep))=#
+			#=delete!(x,key)=#
+		#=end=#
+	#=end=#
+	xreturn=Dict()
+	for time in tkeep
+		xreturn[time]=x[time]
 	end
-	return(x);
+	return(xreturn);
 end
 
 function FFBS2(y::Dict,tkeep,λ,q)
@@ -185,16 +189,20 @@ function FFBS2(y::Dict,tkeep,λ,q)
 			x[t[i]]=y[t[i]]
 		end
 	end
-	for key in keys(x)
-		if(!(key in tkeep))
-			delete!(x,key)
-		end
+	#=for key in keys(x)=#slow
+		#=if(!(key in tkeep))=#
+			#=delete!(x,key)=#
+		#=end=#
+	#=end=#
+	xreturn=Dict()
+	for time in tkeep
+		xreturn[time]=x[time]
 	end
-	return(x);
+	return(xreturn);
 end
 
 
-function sslogdensity(y,μ,λ,q)
+function sslogdensity(y,μ,β,λ,q)
 	if(λ<0)
 		return(-Inf)
 	end
@@ -215,12 +223,12 @@ function sslogdensity(y,μ,λ,q)
 		A[t[i-1]]=transition(Δ[i],λ)
 		Q[t[i-1]]=innovation(Δ[i],λ,q)
 		AMAQ[t[i-1]]=A[t[i-1]]*M[t[i-1]]*A[t[i-1]]'+Q[t[i-1]]
-		m[t[i]]=A[t[i-1]]*m[t[i-1]]+AMAQ[t[i-1]][:,1]*(y[t[i]]-μ-A[t[i-1]][1,:]*m[t[i-1]])/(σ²+AMAQ[t[i-1]][1,1])
-		M[t[i]]=AMAQ[t[i-1]]-(AMAQ[t[i-1]][:,1]*AMAQ[t[i-1]][1,:])/(σ²+AMAQ[t[i-1]][1,1])
+		m[t[i]]=A[t[i-1]]*m[t[i-1]]+β*AMAQ[t[i-1]][:,1]*(y[t[i]]-μ-β*A[t[i-1]][1,:]*m[t[i-1]])/(σ²+β*AMAQ[t[i-1]][1,1]*β)
+		M[t[i]]=AMAQ[t[i-1]]-β*(AMAQ[t[i-1]][:,1]*AMAQ[t[i-1]][1,:])*β/(σ²+β*AMAQ[t[i-1]][1,1]*β)
 	end
 	logdensity=0
 	for i=1:n
-		logdensity=logdensity+logpdf(Normal(μ+(A[t[i-1]][1,:]*m[t[i-1]])[1],sqrt(σ²+AMAQ[t[i-1]][1,1])),y[t[i]])
+		logdensity=logdensity+logpdf(Normal(μ+β*(A[t[i-1]][1,:]*m[t[i-1]])[1],sqrt(σ²+β*AMAQ[t[i-1]][1,1]*β)),y[t[i]])
 	end
 	return(logdensity)
 end
