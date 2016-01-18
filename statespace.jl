@@ -201,8 +201,7 @@ function FFBS2(y::Dict,tkeep,λ,q)
 	return(xreturn);
 end
 
-
-function sslogdensity(y,μ,β,λ,q)
+function sslogdensity(y,gᵧ,μ,β,σ²,λ,q)
 	if(λ<0)
 		return(-Inf)
 	end
@@ -211,24 +210,150 @@ function sslogdensity(y,μ,β,λ,q)
 	end
 	n=length(y)
 	t=Dict(zip(1:n,sort(collect(keys(y)))))
-	t[0]=t[1]-(t[2]-t[1])
-	m=Dict(t[0]=>zeros(d,1))
-	M=Dict(t[0]=>statcov(λ,q))
-	AMAQ=Dict()
-	Δ=Dict()
-	Q=Dict()
-	A=Dict()
-	for i=1:n
-		Δ[i]=t[i]-t[i-1]
-		A[t[i-1]]=transition(Δ[i],λ)
-		Q[t[i-1]]=innovation(Δ[i],λ,q)
-		AMAQ[t[i-1]]=A[t[i-1]]*M[t[i-1]]*A[t[i-1]]'+Q[t[i-1]]
-		m[t[i]]=A[t[i-1]]*m[t[i-1]]+β*AMAQ[t[i-1]][:,1]*(y[t[i]]-μ-β*A[t[i-1]][1,:]*m[t[i-1]])/(σ²+β*AMAQ[t[i-1]][1,1]*β)
-		M[t[i]]=AMAQ[t[i-1]]-β*(AMAQ[t[i-1]][:,1]*AMAQ[t[i-1]][1,:])*β/(σ²+β*AMAQ[t[i-1]][1,1]*β)
+	if(gᵧ==1)
+		t[0]=t[1]-(t[2]-t[1])
+		m=Dict(t[0]=>zeros(d,1))
+		M=Dict(t[0]=>statcov(λ,q))
+		AMAQ=Dict()
+		Δ=Dict()
+		Q=Dict()
+		A=Dict()
+		for i=1:n
+			Δ[i]=t[i]-t[i-1]
+			A[t[i-1]]=transition(Δ[i],λ)
+			Q[t[i-1]]=innovation(Δ[i],λ,q)
+			AMAQ[t[i-1]]=A[t[i-1]]*M[t[i-1]]*A[t[i-1]]'+Q[t[i-1]]
+			m[t[i]]=A[t[i-1]]*m[t[i-1]]+β*AMAQ[t[i-1]][:,1]*(y[t[i]]-μ-β*A[t[i-1]][1,:]*m[t[i-1]])/(σ²+β*AMAQ[t[i-1]][1,1]*β)
+			M[t[i]]=AMAQ[t[i-1]]-β*(AMAQ[t[i-1]][:,1]*AMAQ[t[i-1]][1,:])*β/(σ²+β*AMAQ[t[i-1]][1,1]*β)
+		end
+		logdensity=0
+		for i=1:n
+			logdensity=logdensity+logpdf(Normal(μ+β*(A[t[i-1]][1,:]*m[t[i-1]])[1],sqrt(σ²+β*AMAQ[t[i-1]][1,1]*β)),y[t[i]])
+		end
+		return(logdensity)
+	else
+		logdensity=0
+		for i=1:n
+			logdensity=logdensity+logpdf(Normal(μ,sqrt(σ²)),y[t[i]])
+		end
+		return(logdensity)
 	end
-	logdensity=0
-	for i=1:n
-		logdensity=logdensity+logpdf(Normal(μ+β*(A[t[i-1]][1,:]*m[t[i-1]])[1],sqrt(σ²+β*AMAQ[t[i-1]][1,1]*β)),y[t[i]])
-	end
-	return(logdensity)
 end
+
+function sslogdensity2(y,gᵧ,μ,β,σ²,λ,q)
+	if(λ<0)
+		return(-Inf)
+	end
+	if(q<0)
+		return(-Inf)
+	end
+	n=length(y)
+	t=Dict(zip(1:n,sort(collect(keys(y)))))
+	if(gᵧ==1)
+		Mₛ=statcov(λ,q)
+		m=Dict(t[1]=>reshape(Mₛ[:,1]*(y[t[1]]-μ)/(σ²+Mₛ[1,1]),4,1))
+		M=Dict(t[1]=>Mₛ-Mₛ[:,1]*Mₛ[1,:]/(σ²+Mₛ[1,1]))
+		AMAQ=Dict()
+		Δ=Dict()
+		Q=Dict()
+		A=Dict()
+		for i=2:n
+			Δ[i]=t[i]-t[i-1]
+			A[t[i-1]]=transition(Δ[i],λ)
+			Q[t[i-1]]=innovation(Δ[i],λ,q)
+			AMAQ[t[i-1]]=A[t[i-1]]*M[t[i-1]]*A[t[i-1]]'+Q[t[i-1]]
+			m[t[i]]=A[t[i-1]]*m[t[i-1]]+β*AMAQ[t[i-1]][:,1]*(y[t[i]]-μ-β*A[t[i-1]][1,:]*m[t[i-1]])/(σ²+β*AMAQ[t[i-1]][1,1]*β)
+			M[t[i]]=AMAQ[t[i-1]]-β*(AMAQ[t[i-1]][:,1]*AMAQ[t[i-1]][1,:])*β/(σ²+β*AMAQ[t[i-1]][1,1]*β)
+		end
+		logdensity=logpdf(Normal(μ,sqrt(σ²+Mₛ[1,1])),y[t[1]])
+		for i=2:n
+			logdensity=logdensity+logpdf(Normal(μ+β*(A[t[i-1]][1,:]*m[t[i-1]])[1],sqrt(σ²+β*AMAQ[t[i-1]][1,1]*β)),y[t[i]])
+		end
+		return(logdensity)
+	else
+		logdensity=0
+		for i=1:n
+			logdensity=logdensity+logpdf(Normal(μ,sqrt(σ²)),y[t[i]])
+		end
+		return(logdensity)
+	end
+end
+
+
+function mu(y,gᵧ,σ²ₘ,σ²,λ,q)
+	n=length(y)
+	t=Dict(zip(1:n,sort(collect(keys(y)))))
+	if(gᵧ==1)
+		Mₛ=statcov(λ,q)
+		m=Dict(t[1]=>reshape(Mₛ[:,1]*(y[t[1]]-μ)/(σ²+Mₛ[1,1]),4,1))
+		M=Dict(t[1]=>Mₛ-Mₛ[:,1]*Mₛ[1,:]/(σ²+Mₛ[1,1]))
+		AMAQ=Dict()
+		Δ=Dict()
+		Q=Dict()
+		A=Dict()
+		for i=2:n
+			Δ[i]=t[i]-t[i-1]
+			A[t[i-1]]=transition(Δ[i],λ)
+			Q[t[i-1]]=innovation(Δ[i],λ,q)
+			AMAQ[t[i-1]]=A[t[i-1]]*M[t[i-1]]*A[t[i-1]]'+Q[t[i-1]]
+			m[t[i]]=A[t[i-1]]*m[t[i-1]]+AMAQ[t[i-1]][:,1]*(y[t[i]]-μ-A[t[i-1]][1,:]*m[t[i-1]])/(σ²+AMAQ[t[i-1]][1,1])
+			M[t[i]]=AMAQ[t[i-1]]-(AMAQ[t[i-1]][:,1]*AMAQ[t[i-1]][1,:])/(σ²+AMAQ[t[i-1]][1,1])
+		end
+		muprec=1/σ²ₘ
+		muprec=muprec+1/(σ²+Mₛ[1,1])
+		for i=2:n
+			muprec=muprec+1/(σ²+AMAQ[t[i-1]][1,1])
+		end
+		mumean=0/σ²ₘ
+		mumean=mumean+y[t[1]]/(σ²+Mₛ[1,1])
+		for i=2:n
+			mumean=mumean+(y[t[i]]-(A[t[i-1]]*m[t[i-1]])[1,1])/(σ²+AMAQ[t[i-1]][1,1])
+		end
+		return(rand(Normal(mumean/muprec,sqrt(1/muprec))))
+	else
+		return(rand(Normal(n*mean([y[key] for key in keys(y)])/(n+1/σ²ₘ),sqrt(1/(n+1/σ²ₘ)))))
+	end
+end
+
+
+function rho(ρ²,g,gᵧ,λ,q)
+	n=length(g)
+	t=Dict(zip(1:n,sort(collect(keys(g)))))
+	if(gᵧ==1)
+		Mₛ=statcov(λ,q)
+		Δ=Dict()
+		Q=Dict()
+		A=Dict()
+		for i=2:n
+			Δ[i]=t[i]-t[i-1]
+			A[t[i-1]]=transition(Δ[i],λ)
+			Q[t[i-1]]=innovation(Δ[i],λ,q)
+		end
+		ρ²shape=0
+		ρ²rate=(g[t[1]]'*\(Mₛ/ρ²,g[t[1]]))[1]
+		for i=2:n
+			res=(g[t[i]]-A[t[i-1]]*g[t[i-1]])
+			E,V=eig(Q[t[i-1]]/ρ²)
+			subind=zeros(Int64,4)
+			for w=1:length(E)
+				if(E[w]<sqrt(eps(real(float(one(eltype(Q[t[i-1]]/ρ²)))))))
+					E[w]=Inf
+				else
+					subind[w]=1
+				end
+			end
+			subindices=find(x->x==1,subind)
+			ρ²shape=ρ²shape+length(subindices)
+			ρ²rate=ρ²rate+(res'*V[:,subindices]*Diagonal(1./E[subindices])*V[:,subindices]'*res)[1]
+			#=ρ²rate=ρ²rate+(res'*\(Q[t[i-1]]/ρ²,res))[1]=#
+			#=ρ²rate=ρ²rate+(res'*pinv(Q[t[i-1]]/ρ²)*res)[1]=#
+			#=ρ²rate=ρ²rate+(res'*pinv(Q[t[i-1]]/ρ²,sqrt(eps(real(float(one(eltype(Q[t[i-1]])))))))*res)[1]=#
+		end
+		#=println((n*d+r)/2)=#
+		#=println(2/(ρ²rate+r))=#
+		return(rand(InverseGamma(0.5*(ρ²shape+r),0.5*(ρ²rate+r))))
+	else
+		return(rand(InverseGamma(r/2,r/2)))
+	end
+end
+
