@@ -1,14 +1,14 @@
 importall Base.Random
 importall Distributions
-using PyPlot
+importall PyPlot
 
 include("poissonpointprocess.jl")
 include("analyticalEigen.jl")
 include("statespace.jl")
-include("fulldatageneration.jl")
+include("fulldatageneration2.jl")
 
 
-niter=40
+niter=400
 iter=1
 gᵧ=1
 σ²ₘ=3
@@ -21,7 +21,6 @@ gᵧTrace=zeros(niter)
 logodds=1
 logoddsTrace=zeros(niter)
 σ²=1.0
-μ=0.0
 for key in keys(f₀)
 	f₀[key]=zeros(d,1)
 end
@@ -34,134 +33,44 @@ end
 
 for iter=1:niter
 	println(iter)
+	#=println(iter)=#
 	Ξₚ=PPProcess(Λ)
 
-	#Sample ξ₀ₐ
-	for t in keys(ξ₀ₐ)
-			ξ₀ₐ[t]["yf"]=rand(Truncated(Normal(f₀[t][1],1),0,Inf))
-	end
+	#Sample Realizations
+	Ξ₀ₐ(ξ₀ₐ,μ₀,f₀);
+	ξ₀ᵣ=Ξ₀ᵣ(μ₀,f₀,ł₀,ρ²₀,Ξₚ,Tobs);
+	Ξ₁ₐ(ξ₁ₐ,μ₁,f₁);
+	ξ₁ᵣ=Ξ₁ᵣ(μ₁,f₁,ł₁,ρ²₁,Ξₚ,Tobs);
+	ξ₀ₐᵣ=Ξ₀ₐᵣ(μg,g,łg,ρ²g,μ₀,f₀,ł₀,ρ²₀,Ξₚ,Tobs);
+	ξ₀ᵣᵣ=Ξ₀ᵣᵣ(μ₀,f₀,ł₀,ρ²₀,Ξₚ,Tobs);
+	ξ₁ₐᵣ=Ξ₁ₐᵣ(μg,g,łg,ρ²g,μ₁,f₁,ł₁,ρ²₁,Ξₚ,Tobs);
+	ξ₁ᵣᵣ=Ξ₁ᵣᵣ(μ₁,f₁,ł₁,ρ²₁,Ξₚ,Tobs);
+	ξ₀ₐₐ,ξ₁ₐₐ=Ξ₀ₐₐ₁ₐₐ(μ₀,f₀,ł₀,ρ²₀,μ₁,f₁,ł₁,ρ²₁,μg,g,łg,ρ²g,Td);
 
-	#Sample ξ₀ᵣ
-	Tₚ=rand(Ξₚ,0,Tobs)
-	fₚ=FFBS2(f₀,Tₚ,ł,ρ²)
-	ξ₀ᵣ=Dict{Float64,Dict{UTF8String,Float64}}()
-	for t in Tₚ
-		if(rand(Bernoulli(1-Φ(fₚ[t][1])))==1)
-			ξ₀ᵣ[t]=Dict{UTF8String,Float64}("yf"=>rand(Truncated(Normal(fₚ[t][1],1),-Inf,0)))
+	#sample latent normals
+	y₀,y₁,yg=Y₀Y₁Yg(ξ₀ₐ,ξ₀ᵣ,ξ₁ₐ,ξ₁ᵣ,ξ₀ₐₐ,ξ₀ₐᵣ,ξ₁ₐₐ,ξ₁ₐᵣ,ξ₀ᵣᵣ,ξ₁ᵣᵣ);
+
+	logodds=(sslogdensity(yg,1,μg,σ²,łg,ρ²g)-sslogdensity(yg,0,μg,σ²,łg,ρ²g))
+	odds=exp(logodds)
+	if(odds==Inf)
+		gᵧ=1
+	elseif(odds==-Inf)
+		gᵧ=0
+	else
+		gᵧ=rand(Bernoulli(odds/(1+odds)))
+	end
+	if(gᵧ==1)
+		g=FFBS(yg,collect(keys(yg)),μg,σ²,łg,ρ²g)
+	else
+		g=Dict{Float64,Array{Float64,2}}()
+		for key in keys(yg)
+			g[key]=zeros(Float64,d,1)
 		end
 	end
-
-	#Sample ξ₁ₐ
-	for t in keys(ξ₁ₐ)
-			ξ₁ₐ[t]["yf"]=rand(Truncated(Normal(f₁[t][1],1),0,Inf))
-	end
-
-	#Sample ξ₁ᵣ
-	Tₚ=rand(Ξₚ,0,Tobs)
-	fₚ=FFBS2(f₁,Tₚ,ł,ρ²)
-	ξ₁ᵣ=Dict{Float64,Dict{UTF8String,Float64}}()
-	for t in Tₚ
-		if(rand(Bernoulli(1-Φ(fₚ[t][1])))==1)
-			ξ₁ᵣ[t]=Dict{UTF8String,Float64}("yf"=>rand(Truncated(Normal(fₚ[t][1],1),-Inf,0)))
-		end
-	end
-
-	#Sample ξ₀ₐᵣ
-	Tₚ=rand(Ξₚ,0,Tobs)
-	gₚ=FFBS2(g,Tₚ,ł,ρ²)
-	fₚ=FFBS2(f₀,Tₚ,ł,ρ²)
-	ξ₀ₐᵣ=Dict{Float64,Dict{UTF8String,Float64}}()
-	for t in Tₚ
-		if(rand(Bernoulli((1-Φ(gₚ[t][1]))*Φ(fₚ[t][1])))==1)
-			ξ₀ₐᵣ[t]=Dict{UTF8String,Float64}("yf"=>rand(Truncated(Normal(fₚ[t][1],1),0,Inf)),"yg"=>rand(Truncated(Normal(gₚ[t][1],1),-Inf,0)))
-		end
-	end
-
-	#sample ξ₀ᵣᵣ
-	Tₚ=rand(Ξₚ,0,Tobs)
-	fₚ=FFBS2(f₀,Tₚ,ł,ρ²)
-	ξ₀ᵣᵣ=Dict{Float64,Dict{UTF8String,Float64}}()
-	for t in Tₚ
-		if(rand(Bernoulli(1-Φ(fₚ[t][1])))==1)
-			ξ₀ᵣᵣ[t]=Dict{UTF8String,Float64}("yf"=>rand(Truncated(Normal(fₚ[t][1],1),-Inf,0)))
-		end
-	end
-
-	#Sample ξ₁ₐᵣ
-	Tₚ=rand(Ξₚ,0,Tobs)
-	gₚ=FFBS2(g,Tₚ,ł,ρ²)
-	fₚ=FFBS2(f₁,Tₚ,ł,ρ²)
-	ξ₁ₐᵣ=Dict{Float64,Dict{UTF8String,Float64}}()
-	for t in Tₚ
-		if(rand(Bernoulli(Φ(gₚ[t][1])*Φ(fₚ[t][1])))==1)
-			ξ₀ₐᵣ[t]=Dict{UTF8String,Float64}("yf"=>rand(Truncated(Normal(fₚ[t][1],1),0,Inf)),"yg"=>rand(Truncated(Normal(gₚ[t][1],1),0,Inf)))
-		end
-	end
-
-	#sample ξ₁ᵣᵣ
-	Tₚ=rand(Ξₚ,0,Tobs)
-	fₚ=FFBS2(f₁,Tₚ,ł,ρ²)
-	ξ₁ᵣᵣ=Dict{Float64,Dict{UTF8String,Float64}}()
-	for t in Tₚ
-		if(rand(Bernoulli(1-Φ(fₚ[t][1])))==1)
-			ξ₁ᵣᵣ[t]=Dict{UTF8String,Float64}("yf"=>rand(Truncated(Normal(fₚ[t][1],1),-Inf,0)))
-		end
-	end
-
-	ξ₀ₐₐ=Dict{Float64,Dict{UTF8String,Float64}}()
-	ξ₁ₐₐ=Dict{Float64,Dict{UTF8String,Float64}}()
-	gₚ=FFBS2(g,Td,ł,ρ²)
-	f₀ₚ=FFBS2(f₀,Td,ł,ρ²)
-	f₁ₚ=FFBS2(f₁,Td,ł,ρ²)
-	for t in Td
-		denominator=Φ(gₚ[t][1])*Φ(f₀ₚ[t][1])+(1-Φ(gₚ[t][1]))*Φ(f₁ₚ[t][1])
-		if(rand(Bernoulli((1-Φ(gₚ[t][1]))*Φ(f₁ₚ[t][1])/denominator))==1)
-			ξ₁ₐₐ[t]=Dict("yf"=>rand(Truncated(Normal(f₁ₚ[t][1],1),0,Inf)), "yg"=>rand(Truncated(Normal(gₚ[t][1],1),-Inf,0)))
-		else
-			ξ₀ₐₐ[t]=Dict("yf"=>rand(Truncated(Normal(f₀ₚ[t][1],1),0,Inf)), "yg"=>rand(Truncated(Normal(gₚ[t][1],1),0,Inf)))
-		end
-	end
-
-	yf0=Dict{Float64,Float64}()
-	yf1=Dict{Float64,Float64}()
-	yg=Dict{Float64,Float64}()
-	for t in keys(ξ₀ₐ)
-		yf0[t]=ξ₀ₐ[t]["yf"]
-	end
-	for t in keys(ξ₀ᵣ)
-		yf0[t]=ξ₀ᵣ[t]["yf"]
-	end
-	for t in keys(ξ₁ₐ)
-		yf1[t]=ξ₁ₐ[t]["yf"]
-	end
-	for t in keys(ξ₁ᵣ)
-		yf1[t]=ξ₁ᵣ[t]["yf"]
-	end
-	for t in keys(ξ₀ₐₐ)
-		yf0[t]=ξ₀ₐₐ[t]["yf"]
-		yg[t]=ξ₀ₐₐ[t]["yg"]
-	end
-	for t in keys(ξ₀ₐᵣ)
-		yf0[t]=ξ₀ₐᵣ[t]["yf"]
-		yg[t]=ξ₀ₐᵣ[t]["yg"]
-	end
-	for t in keys(ξ₁ₐₐ)
-		yf1[t]=ξ₁ₐₐ[t]["yf"]
-		yg[t]=ξ₁ₐₐ[t]["yg"]
-	end
-	for t in keys(ξ₁ₐᵣ)
-		yf1[t]=ξ₁ₐᵣ[t]["yf"]
-		yg[t]=ξ₁ₐᵣ[t]["yg"]
-	end
-	for t in keys(ξ₀ᵣᵣ)
-		yf0[t]=ξ₀ᵣᵣ[t]["yf"]
-	end
-	for t in keys(ξ₁ᵣᵣ)
-		yf1[t]=ξ₁ᵣᵣ[t]["yf"]
-	end
-	g=FFBS(yg,collect(keys(yg)),μ,σ²,ł,ρ²)
-	f₀=FFBS(yf0,collect(keys(yf0)),μ,σ²,ł,ρ²)
-	f₁=FFBS(yf1,collect(keys(yf1)),μ,σ²,ł,ρ²)
+	n1=length(g)
+	μg=rand(Normal((n1/σ²)*mean([yg[key]-g[key][1] for key in keys(g)])*(1/((n1/σ²)+(1/σ²ₘ))),sqrt(1/((n1/σ²)+(1/σ²ₘ)))))
+	f₀=FFBS(y₀,collect(keys(y₀)),μ₀,σ²,ł₀,ρ²₀)
+	f₁=FFBS(y₁,collect(keys(y₁)),μ₁,σ²,ł₁,ρ²₁)
 	#=łₚ=ł+rand(Normal(0,0.03));	λₚ=sqrt(2*ν)/łₚ;	qₚ=2*ρ²*√π*λₚ^(2*p+1)*gamma(p+1)/gamma(p+0.1);=#
 	#=if(log(rand(Uniform(0,1)))<glogdensity(g,gᵧ,λₚ,qₚ)-glogdensity(g,gᵧ,ł,ρ²))=#
 		#=ł=łₚ=#
@@ -174,21 +83,31 @@ for iter=1:niter
 	#=μ=rand(Normal((n1/σ²)*mean([y[key]-g[key][1] for key in keys(g)])*(1/((n1/σ²)+(1/σ²ₘ))),sqrt(1/((n1/σ²)+(1/σ²ₘ)))))=#
 	#=ρ²Trace[iter]=ρ²=#
 	#=łTrace[iter]=ł=#
-	#=μTrace[iter]=μ=#
-	#=logoddsTrace[iter]=logodds=#
-	#=gᵧTrace[iter]=gᵧ=#
+	μTrace[iter]=μg
+	logoddsTrace[iter]=logodds
+	gᵧTrace[iter]=gᵧ
 	#=plot(sort(collect(keys(g))),Φ([g[key][1] for key in sort(collect(keys(g)))]),c="grey",alpha=0.1);=#
 	subplot(411)
-	plot(convert(Array{Float64,1},sort(collect(keys(f₀)))),convert(Array{Float64},[Λ*Φ(f₀[key][1]) for key in sort(collect(keys(f₀)))]),c="grey",alpha=0.1)
+	plot(convert(Array{Float64,1},sort(collect(keys(f₀)))),convert(Array{Float64},[Λ*Φ(μ₀+f₀[key][1]) for key in sort(collect(keys(f₀)))]),c="grey",alpha=0.1)
 	#=plot(sort(collect(keys(f₀))),([f₀[key][1] for key in sort(collect(keys(f₀)))]),c="grey",alpha=0.1);=#
 	subplot(412)
-	plot(convert(Array{Float64,1},sort(collect(keys(f₁)))),convert(Array{Float64},[Λ*Φ(f₁[key][1]) for key in sort(collect(keys(f₁)))]),c="grey",alpha=0.1)
+	plot(convert(Array{Float64,1},sort(collect(keys(f₁)))),convert(Array{Float64},[Λ*Φ(μ₁+f₁[key][1]) for key in sort(collect(keys(f₁)))]),c="grey",alpha=0.1)
 	#=plot(sort(collect(keys(f₁))),([f₁[key][1] for key in sort(collect(keys(f₁)))]),c="grey",alpha=0.1);=#
 	subplot(413)
-	plot(convert(Array{Float64,1},sort(collect(keys(g)))),convert(Array{Float64},[Φ(g[key][1]) for key in sort(collect(keys(g)))]),c="grey",alpha=0.1)
+	plot(convert(Array{Float64,1},sort(collect(keys(g)))),convert(Array{Float64},[Φ(μg+g[key][1]) for key in sort(collect(keys(g)))]),c="grey",alpha=0.1)
 	#=plot(sort(collect(keys(g))),([g[key][1] for key in sort(collect(keys(g)))]),c="grey",alpha=0.1);=#
-	#=subplot(414)=#
-	#=plot(convert(Array{Float64,1},sort(collect(keys(g)))),convert(Array{Float64},[Φ(g[key][1])*Λ*Φ(f₀[key][1])+(1-Φ(g[key][1]))*Λ*Φ(f₁[key][1]) for key in sort(collect(keys(g)))]),c="grey",alpha=0.1)=#
+	subplot(414)
+	Tₚ=sort(rand(Ξₚ,0,Tobs))
+	gₚ=FFBS2(g,Tₚ,łg,ρ²g)
+	f₀ₚ=FFBS2(f₀,Tₚ,ł₀,ρ²₀)
+	f₁ₚ=FFBS2(f₁,Tₚ,ł₁,ρ²₁)
+	plot(Tₚ,[Φ(μg+gₚ[key][1])*Λ*Φ(μ₀+f₀ₚ[key][1])+(1-Φ(μg+gₚ[key][1]))*Λ*Φ(μ₀+f₁ₚ[key][1]) for key in Tₚ],c="grey",alpha=0.1)
+	#=plot(sort(collect(keys(ξ₀ₐₐ))),-2000*ones(length(ξ₀ₐₐ)),c="white",marker="|",linestyle="None",markersize=10)=#
+	#=plot(sort(collect(keys(ξ₁ₐₐ))),-2000*ones(length(ξ₁ₐₐ)),c="white",marker="|",linestyle="None",markersize=10)=#
+	#=plot(sort(collect(keys(ξ₀ₐₐ))),-2000*ones(length(ξ₀ₐₐ)),c="white",marker="|",linestyle="None",markersize=10)=#
+	#=plot(sort(collect(keys(ξ₁ₐₐ))),-2000*ones(length(ξ₁ₐₐ)),c="white",marker="|",linestyle="None",markersize=10)=#
+	#=plot(sort(collect(keys(ξ₀ₐₐ))),-2000*ones(length(ξ₀ₐₐ)),c="blue",marker="|",linestyle="None",markersize=10)=#
+	#=plot(sort(collect(keys(ξ₁ₐₐ))),-2000*ones(length(ξ₁ₐₐ)),c="red",marker="|",linestyle="None",markersize=10)=#
 end
 figure()
 subplot(511)

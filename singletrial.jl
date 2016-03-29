@@ -1,6 +1,6 @@
 importall Base.Random
 importall Distributions
-using PyPlot
+importall PyPlot
 
 include("statespace.jl")
 include("poissonpointprocess.jl")
@@ -180,8 +180,8 @@ for iter=1:niter
 		#=g[key][4]=gtrue[key][4]=#
 	#=end=#
 	#=plot([g[key][4] for key in sort(collect(keys(g)))],c="red",alpha=0.1)=#
-	łₚ=ł+rand(Normal(0,0.03));	λₚ=sqrt(2*ν)/łₚ;	qₚ=2*ρ²*√π*λₚ^(2*p+1)*gamma(p+1)/gamma(p+0.5);
-	if(log(rand(Uniform(0,1)))<glogdensity(g,gᵧ,λₚ,qₚ)-glogdensity(g,gᵧ,λ,q))
+	łₚ=ł+rand(Normal(0,0.03);
+	if(log(rand(Uniform(0,1)))<sslogdensity(y,gᵧ,μ,σ²,łₚ,ρ²)-sslogdensity(y,gᵧ,μ,σ²,ł,ρ²))
 		ł=łₚ
 		λ=λₚ
 		q=qₚ
