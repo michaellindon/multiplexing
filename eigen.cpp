@@ -92,9 +92,10 @@ inline void RevInnovation3d(Matrix3d & Q, double d, double l){
 	Q(2,1)=Q(1,2);
 	Q(2,2)=(q*(3.0+em2dl*(-3.0-2.0*d*l*(-5.0+d*l*(11.0+d*l*(-6.0+d*l))))))/(16.0*l);
 }
-extern "C" void FFBS3d(double * y, double * xout, double * t, int n, double ls, double s2, double p2, double mu)
+extern "C" void FFBS3d(double * y, double * xout, double * t, int n, double ls, double s2, double p2, double mu, double * jz)
 {
 	Map<MatrixXd> x(xout,3,n);
+	Map<MatrixXd> Z(jz,3,n);
 	std::vector< Vector3d> m(n);
 	std::vector< Matrix3d> M(n);
 	std::vector< Matrix3d> AMAQ(n);
@@ -131,28 +132,33 @@ extern "C" void FFBS3d(double * y, double * xout, double * t, int n, double ls, 
 
 	//Backward Sampling
 	Matrix3d S=0.5*(M[n-1]+M[n-1].transpose());
-	Vector3d Z;
-	std::random_device rd;std::mt19937 engine(rd());
-	std::normal_distribution<double> N(0,1);
-	for(int i=0;i<3;++i) Z(i)=N(engine);
 	Eigen::LDLT<Matrix3d> ldlt;
 	ldlt.compute(S);
 	Matrix3d L(ldlt.matrixL());
 	Vector3d D(ldlt.vectorD());
 	for(int j=0;j<3;++j) D(j)=std::max(D(j),0.0);
 
-	x.col(n-1)=m[n-1]+ldlt.transpositionsP().transpose()*L*D.cwiseSqrt().asDiagonal()*Z;
+	x.col(n-1)=m[n-1]+ldlt.transpositionsP().transpose()*L*D.cwiseSqrt().asDiagonal()*Z.col(n-1);
 	for(int i=(n-2); i>=0;--i){
-		Eigen::FullPivLU<Matrix3d> lu(AMAQ[i]);
-		x.col(i)=m[i]+M[i]*A[i].transpose()*lu.solve(x.col(i+1)-A[i]*m[i]);
-		S=M[i]-M[i]*A[i].transpose()*lu.solve(A[i]*M[i]);
+		Eigen::JacobiSVD<Matrix3d> mysvd(AMAQ[i], Eigen::ComputeFullU | Eigen::ComputeFullV);
+		Vector3d singularValues=mysvd.singularValues();
+		double pinvtol=1.e-7;
+		for(int v=0; v<3; ++v){
+			if(singularValues(v)<pinvtol){
+				singularValues(v)=0.0;
+			}else{
+				singularValues(v)=1.0/singularValues(v);
+			}
+		}
+		Matrix3d Qinv=mysvd.matrixV()*singularValues.asDiagonal()*mysvd.matrixU().transpose();
+		x.col(i)=m[i]+M[i]*A[i].transpose()*Qinv*(x.col(i+1)-A[i]*m[i]);
+		S=M[i]-M[i]*A[i].transpose()*Qinv*(A[i]*M[i]);
 		S=0.5*(S+S.transpose());
 		ldlt.compute(S);
 		Matrix3d L(ldlt.matrixL());
 		Vector3d D(ldlt.vectorD());
 		for(int j=0;j<3;++j) D(j)=std::max(D(j),0.0);
-		for(int i=0;i<3;++i) Z(i)=N(engine);
-		x.col(i)+=ldlt.transpositionsP().transpose()*L*D.cwiseSqrt().asDiagonal()*Z;
+		x.col(i)+=ldlt.transpositionsP().transpose()*L*D.cwiseSqrt().asDiagonal()*Z.col(i);
 	}
 	Map<MatrixXd>( xout, x.rows(), x.cols() ) =  x;
 }
@@ -168,9 +174,19 @@ extern "C" void ThreePoint(double * jx, double * jz, double t, double tl, double
 	Innovation3d(Ql,t-tl,l);
 	Transition3d(Al,t-tl,l);
 	Transition3d(Ar,tr-t,l);
-	Eigen::FullPivLU<Matrix3d> lu(Qrl);
-	x=Al*vl+Ql*Ar.transpose()*lu.solve(vr-Ar*Al*vl);
-	Q.compute(Ql-Ql*Ar.transpose()*lu.solve(Ar*Ql));
+	Eigen::JacobiSVD<Matrix3d> mysvd(Qrl, Eigen::ComputeFullU | Eigen::ComputeFullV);
+	Vector3d singularValues=mysvd.singularValues();
+	double pinvtol=1.e-7;
+	for(int v=0; v<3; ++v){
+		if(singularValues(v)<pinvtol){
+			singularValues(v)=0.0;
+		}else{
+			singularValues(v)=1.0/singularValues(v);
+		}
+	}
+	Matrix3d Qinv=mysvd.matrixV()*singularValues.asDiagonal()*mysvd.matrixU().transpose();
+	x=Al*vl+Ql*Ar.transpose()*Qinv*(vr-Ar*Al*vl);
+	Q.compute(Ql-Ql*Ar.transpose()*Qinv*(Ar*Ql));
 	Matrix3d L(Q.matrixL());
 	Vector3d D(Q.vectorD());
 	for(int j=0;j<3;++j) D(j)=std::max(D(j),0.0);
@@ -186,9 +202,19 @@ inline Vector3d ThreePoint(std::mt19937 & engine, double t, double tl, Vector3d 
 	Innovation3d(Ql,t-tl,l);
 	Transition3d(Al,t-tl,l);
 	Transition3d(Ar,tr-t,l);
-	Eigen::FullPivLU<Matrix3d> lu(Qrl);
-	Vector3d x=Al*vl+Ql*Ar.transpose()*lu.solve(vr-Ar*Al*vl);
-	Q.compute(Ql-Ql*Ar.transpose()*lu.solve(Ar*Ql));
+	Eigen::JacobiSVD<Matrix3d> mysvd(Qrl, Eigen::ComputeFullU | Eigen::ComputeFullV);
+	Vector3d singularValues=mysvd.singularValues();
+	double pinvtol=1.e-7;
+	for(int v=0; v<3; ++v){
+		if(singularValues(v)<pinvtol){
+			singularValues(v)=0.0;
+		}else{
+			singularValues(v)=1.0/singularValues(v);
+		}
+	}
+	Matrix3d Qinv=mysvd.matrixV()*singularValues.asDiagonal()*mysvd.matrixU().transpose();
+	Vector3d x=Al*vl+Ql*Ar.transpose()*Qinv*(vr-Ar*Al*vl);
+	Q.compute(Ql-Ql*Ar.transpose()*Qinv*(Ar*Ql));
 	Matrix3d L(Q.matrixL());
 	Vector3d D(Q.vectorD());
 	for(int j=0;j<3;++j) D(j)=std::max(D(j),0.0);
@@ -419,4 +445,49 @@ extern "C" void Predict3d(double * xin, double * tc, int nc, double * xout, doub
 	Map<MatrixXd>( xout, xp.rows(), xp.cols() ) =   xp;
 }
 
+
+
+extern "C" void mu3d(double * y, double * t, int n, double s2, double ls, double p2, double * mean, double * prec)
+{
+
+	std::vector< Matrix3d> M(n);
+	std::vector< Matrix3d> AMAQ(n);
+	std::vector< Matrix3d> A(n);
+	Matrix3d Cor;
+	Matrix3d Q;
+	double l=sqrt(5.0)/ls;
+	double l2=l*l;
+	double l3=l*l*l;
+	double l5=l*l*l*l*l;
+	double q=(16.0*l5)/3.0;
+
+	//Stationary Correlation Matrix
+	Cor(0,0)=(3.0*q)/(16.0*l5);
+	Cor(0,1)=0.0;
+	Cor(0,2)=-(q/(16.0*l3));
+	Cor(1,0)=0.0;
+	Cor(1,1)=q/(16.0*l3);
+	Cor(1,2)=0.0;
+	Cor(2,0)=-(q/(16.0*l3));
+	Cor(2,1)=0.0;
+	Cor(2,2)=(3.0*q)/(16.0*l);
+	Vector3d C=p2*Cor.col(0)*(y[0])/(s2+p2*Cor(0,0));
+	Vector3d D=-p2*Cor.col(0)/(s2+p2*Cor(0,0));
+	M[0]=p2*Cor-p2*Cor.col(0)*Cor.row(0)*p2/(s2+p2*Cor(0,0));
+	*prec=1/(s2+p2*Cor(0,0));
+	*mean=y[0]/(s2+p2*Cor(0,0));
+	for(int i=2;i<n;++i){
+		Innovation3d(Q,t[i]-t[i-1],l);
+		Transition3d(A[i-1],t[i]-t[i-1],l);
+		AMAQ[i-1]=A[i-1]*M[i-1]*A[i-1].transpose()+p2*Q;
+		M[i]=AMAQ[i-1]-(AMAQ[i-1].col(0)*AMAQ[i-1].row(0))/(s2+AMAQ[i-1](0,0));
+		Vector3d F=AMAQ[i-1].col(0)/(s2+AMAQ[i-1](0,0));
+		C=C-F*A[i-1].row(0)*C+F*y[i-1];
+		D=D-F*A[i-1].row(0)*D-F;
+		*prec+=(1+A[i-1].row(0)*D)*(1+A[i-1].row(0)*D)/(s2+AMAQ[i-1](0,0));
+		*mean+=(y[i]-A[i-1].row(0)*C)*(1+A[i-1].row(0)*D)/(s2+AMAQ[i-1](0,0));
+	}
+	std::cout << *mean << std::endl;
+	std::cout << *prec << std::endl;
+}
 
