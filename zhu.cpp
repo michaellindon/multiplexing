@@ -24,8 +24,9 @@ inline void priorVariance(Matrix3d & C){
 }
 
 
-inline void Transition3d(Matrix3d & A, double d){
+inline void Transition3d(Matrix3d & A, double d, bool approx){
 	//Transition Matrix
+	if(!approx){
 	A(0,0)=1;
 	A(0,1)=d;
 	A(0,2)=0.5*d*d;
@@ -35,6 +36,17 @@ inline void Transition3d(Matrix3d & A, double d){
 	A(2,0)=0;
 	A(2,1)=0;
 	A(2,2)=1;
+	}else{
+	A(0,0)=1;
+	A(0,1)=d;
+	A(0,2)=0;
+	A(1,0)=0;
+	A(1,1)=1;
+	A(1,2)=d;
+	A(2,0)=0;
+	A(2,1)=0;
+	A(2,2)=1;
+	}
 }
 
 inline void RevTransition3d(Matrix3d & A, double d){
@@ -51,7 +63,8 @@ inline void RevTransition3d(Matrix3d & A, double d){
 }
 
 
-inline void Innovation3d(Matrix3d & Q, double d, double s2u, double s2a){
+inline void Innovation3d(Matrix3d & Q, double d, double s2u, double s2a,bool approx){
+	if(!approx){
 	double d2=d*d;
 	double d3=d2*d;
 	double d4=d3*d;
@@ -64,7 +77,18 @@ inline void Innovation3d(Matrix3d & Q, double d, double s2u, double s2a){
 	Q(1,2)=(1/2)*d2*s2a;
 	Q(2,0)=(1/6)*d3*s2a;
 	Q(2,1)=(1/2)*d2*s2a;
-	Q(2,2)=d*s2a; 
+	Q(2,2)=d*s2a;
+	}else{
+	Q(0,0)=0;
+	Q(0,1)=0;
+	Q(0,2)=0;
+	Q(1,0)=0;
+	Q(1,1)=d*s2u;
+	Q(1,2)=0;
+	Q(2,0)=0;
+	Q(2,1)=0;
+	Q(2,2)=d*s2a;
+	}	
 }
 
 
@@ -84,8 +108,13 @@ inline void RevInnovation3d(Matrix3d & Q, double d, double s2u, double s2a){
 	Q(2,2)=d*s2a; 
 }
 
-extern "C" void FFBS3d(double * y, double * xout, double * t, int n, double s2, double s2u, double s2a, double p2, double mu, double * jz)
+extern "C" void FFBS3d(double * y, double * xout, double * t, int n, double s2, double s2u, double s2a, double p2, double mu, double * jz, bool approx)
 {
+	if(approx){
+		std::cout << "true" << std::endl;
+	}else{
+		std::cout << "false" << std::endl;
+	}
 	Map<MatrixXd> x(xout,3,n);
 	Map<MatrixXd> Z(jz,3,n);
 	std::vector< Vector3d> m(n);
@@ -101,8 +130,8 @@ extern "C" void FFBS3d(double * y, double * xout, double * t, int n, double s2, 
 	M[0]=p2*C-p2*C.col(0)*C.row(0)*p2/(s2+p2*C(0,0));
 	//Forward Filtering
 	for(int i=1;i<n;++i){
-		Innovation3d(Q,t[i]-t[i-1],s2u,s2a);
-		Transition3d(A[i-1],t[i]-t[i-1]);
+		Innovation3d(Q,t[i]-t[i-1],s2u,s2a, approx);
+		Transition3d(A[i-1],t[i]-t[i-1],approx);
 		AMAQ[i-1]=A[i-1]*M[i-1]*A[i-1].transpose()+p2*Q;
 		m[i]=A[i-1]*m[i-1]+AMAQ[i-1].col(0)*(y[i]-mu-A[i-1].row(0)*m[i-1])/(s2+AMAQ[i-1](0,0));
 		M[i]=AMAQ[i-1]-(AMAQ[i-1].col(0)*AMAQ[i-1].row(0))/(s2+AMAQ[i-1](0,0));
@@ -149,10 +178,10 @@ extern "C" void ThreePoint(double * jx, double * jz, double t, double tl, double
 	Map<Vector3d> vl(jvl);
 	Eigen::LDLT<Matrix3d> Q;
 	Matrix3d Qrl,Ql,Al,Ar;
-	Innovation3d(Qrl,tr-tl,s2u,s2a);
-	Innovation3d(Ql,t-tl,s2u,s2a);
-	Transition3d(Al,t-tl);
-	Transition3d(Ar,tr-t);
+	Innovation3d(Qrl,tr-tl,s2u,s2a,false);
+	Innovation3d(Ql,t-tl,s2u,s2a,false);
+	Transition3d(Al,t-tl,false);
+	Transition3d(Ar,tr-t,false);
 	Eigen::JacobiSVD<Matrix3d> mysvd(Qrl, Eigen::ComputeFullU | Eigen::ComputeFullV);
 	Vector3d singularValues=mysvd.singularValues();
 	double pinvtol=1.e-7;
@@ -194,8 +223,8 @@ extern "C" void Forwards(double * jx, double * jz, double t, double tl, double *
 	Map<Vector3d> z(jz);
 	Map<Vector3d> vl(jvl);
 	Matrix3d Al,Ql;
-	Innovation3d(Ql,t-tl,s2u,s2a);
-	Transition3d(Al,t-tl);
+	Innovation3d(Ql,t-tl,s2u,s2a,false);
+	Transition3d(Al,t-tl,false);
 	x=Al*vl;
 	Eigen::LDLT<Matrix3d> S;
 	S.compute(Ql);
@@ -226,8 +255,8 @@ extern "C" double LogDensity3d(double * y, double * t, int gamma, int n, double 
 		M[0]=p2*C-p2*C.col(0)*C.row(0)*p2/(s2+p2*C(0,0));
 		//Forward Filtering
 		for(int i=1;i<n;++i){
-			Innovation3d(Q,t[i]-t[i-1],s2u,s2a);
-			Transition3d(A[i-1],t[i]-t[i-1]);
+			Innovation3d(Q,t[i]-t[i-1],s2u,s2a,false);
+			Transition3d(A[i-1],t[i]-t[i-1],false);
 			AMAQ[i-1]=A[i-1]*M[i-1]*A[i-1].transpose()+p2*Q;
 			m[i]=A[i-1]*m[i-1]+AMAQ[i-1].col(0)*(y[i]-mu-A[i-1].row(0)*m[i-1])/(s2+AMAQ[i-1](0,0));
 			M[i]=AMAQ[i-1]-(AMAQ[i-1].col(0)*AMAQ[i-1].row(0))/(s2+AMAQ[i-1](0,0));
@@ -265,8 +294,8 @@ extern "C" void mu3d(double * y, double * t, int n, double s2, double s2u, doubl
 	*prec=1/(s2+p2*Cor(0,0));
 	*mean=y[0]/(s2+p2*Cor(0,0));
 	for(int i=2;i<n;++i){
-		Innovation3d(Q,t[i]-t[i-1],s2u,s2a);
-		Transition3d(A[i-1],t[i]-t[i-1]);
+		Innovation3d(Q,t[i]-t[i-1],s2u,s2a,false);
+		Transition3d(A[i-1],t[i]-t[i-1],false);
 		AMAQ[i-1]=A[i-1]*M[i-1]*A[i-1].transpose()+p2*Q;
 		M[i]=AMAQ[i-1]-(AMAQ[i-1].col(0)*AMAQ[i-1].row(0))/(s2+AMAQ[i-1](0,0));
 		Vector3d F=AMAQ[i-1].col(0)/(s2+AMAQ[i-1](0,0));
