@@ -295,10 +295,10 @@ extern "C" double LogDensity3d(double * y, double * t, int gamma, int n, double 
 	if(p2<0) return -1.0/0.0;
 
 	if(gamma==1){
-		std::vector< Vector3d> m(n);
-		std::vector< Matrix3d> M(n);
-		std::vector< Matrix3d> AMAQ(n);
-		std::vector< Matrix3d> A(n);
+		Vector3d m;
+		Matrix3d M;
+		Matrix3d AMAQ;
+		Matrix3d A;
 		Matrix3d C;
 		Matrix3d Q;
 		double l=sqrt(5.0)/ls;
@@ -317,20 +317,18 @@ extern "C" double LogDensity3d(double * y, double * t, int gamma, int n, double 
 		C(2,0)=-(q/(16.0*l3));
 		C(2,1)=0.0;
 		C(2,2)=(3.0*q)/(16.0*l);
-		m[0]=p2*C.col(0)*(y[0]-mu)/(s2+p2*C(0,0));
-		M[0]=p2*C-p2*C.col(0)*C.row(0)*p2/(s2+p2*C(0,0));
-		//Forward Filtering
+		m=p2*C.col(0)*(y[0]-mu)/(s2+p2*C(0,0));
+		M=p2*C-p2*C.col(0)*C.row(0)*p2/(s2+p2*C(0,0));
+		double logdensity=-0.5*log(2*M_PI*(s2+p2*C(0,0)))-0.5*(y[0]-mu)*(y[0]-mu)/(s2+p2*C(0,0));
 		for(int i=1;i<n;++i){
 			Innovation3d(Q,t[i]-t[i-1],l);
-			Transition3d(A[i-1],t[i]-t[i-1],l);
-			AMAQ[i-1]=A[i-1]*M[i-1]*A[i-1].transpose()+p2*Q;
-			m[i]=A[i-1]*m[i-1]+AMAQ[i-1].col(0)*(y[i]-mu-A[i-1].row(0)*m[i-1])/(s2+AMAQ[i-1](0,0));
-			M[i]=AMAQ[i-1]-(AMAQ[i-1].col(0)*AMAQ[i-1].row(0))/(s2+AMAQ[i-1](0,0));
-
+			Transition3d(A,t[i]-t[i-1],l);
+			AMAQ=A*M*A.transpose()+p2*Q;
+			logdensity+=-0.5*log(2*M_PI*(s2+AMAQ(0,0))) -0.5*(y[i]-(mu+A.row(0)*m))*(y[i]-(mu+A.row(0)*m))/(s2+AMAQ(0,0));
+			m=A*m+AMAQ.col(0)*(y[i]-mu-A.row(0)*m)/(s2+AMAQ(0,0));
+			M=AMAQ-(AMAQ.col(0)*AMAQ.row(0))/(s2+AMAQ(0,0));
 		}
-		double logdensity=-0.5*log(2*M_PI*(s2+p2*C(0,0)))-0.5*(y[0]-mu)*(y[0]-mu)/(s2+p2*C(0,0));
 		for(int i=1; i<n; ++i){
-			logdensity+=-0.5*log(2*M_PI*(s2+AMAQ[i-1](0,0))) -0.5*(y[i]-(mu+A[i-1].row(0)*m[i-1]))*(y[i]-(mu+A[i-1].row(0)*m[i-1]))/(s2+AMAQ[i-1](0,0));
 		}
 		return(logdensity);
 	}else{
@@ -447,12 +445,14 @@ extern "C" void Predict3d(double * xin, double * tc, int nc, double * xout, doub
 
 
 
-extern "C" void mu3d(double * y, double * t, int n, double s2, double ls, double p2, double * mean, double * prec)
+extern "C" void mu3d(double * y, double * t, int n, double s2, double ls, double p2, double * mean, double * prec, double s2m)
 {
 
-	std::vector< Matrix3d> M(n);
-	std::vector< Matrix3d> AMAQ(n);
-	std::vector< Matrix3d> A(n);
+	Vector3d C;
+	Vector3d D;
+	Matrix3d M;
+	Matrix3d AMAQ;
+	Matrix3d A;
 	Matrix3d Cor;
 	Matrix3d Q;
 	double l=sqrt(5.0)/ls;
@@ -471,23 +471,23 @@ extern "C" void mu3d(double * y, double * t, int n, double s2, double ls, double
 	Cor(2,0)=-(q/(16.0*l3));
 	Cor(2,1)=0.0;
 	Cor(2,2)=(3.0*q)/(16.0*l);
-	Vector3d C=p2*Cor.col(0)*(y[0])/(s2+p2*Cor(0,0));
-	Vector3d D=-p2*Cor.col(0)/(s2+p2*Cor(0,0));
-	M[0]=p2*Cor-p2*Cor.col(0)*Cor.row(0)*p2/(s2+p2*Cor(0,0));
-	*prec=1/(s2+p2*Cor(0,0));
+	C=p2*Cor.col(0)*(y[0])/(s2+p2*Cor(0,0));
+	D=-p2*Cor.col(0)/(s2+p2*Cor(0,0));
+	M=p2*Cor-p2*Cor.col(0)*Cor.row(0)*p2/(s2+p2*Cor(0,0));
+	*prec=1.0/s2m;
 	*mean=y[0]/(s2+p2*Cor(0,0));
-	for(int i=2;i<n;++i){
+	*prec+=1.0/(s2+p2*Cor(0,0));
+	for(int i=1;i<n;++i){
 		Innovation3d(Q,t[i]-t[i-1],l);
-		Transition3d(A[i-1],t[i]-t[i-1],l);
-		AMAQ[i-1]=A[i-1]*M[i-1]*A[i-1].transpose()+p2*Q;
-		M[i]=AMAQ[i-1]-(AMAQ[i-1].col(0)*AMAQ[i-1].row(0))/(s2+AMAQ[i-1](0,0));
-		Vector3d F=AMAQ[i-1].col(0)/(s2+AMAQ[i-1](0,0));
-		C=C-F*A[i-1].row(0)*C+F*y[i-1];
-		D=D-F*A[i-1].row(0)*D-F;
-		*prec+=(1+A[i-1].row(0)*D)*(1+A[i-1].row(0)*D)/(s2+AMAQ[i-1](0,0));
-		*mean+=(y[i]-A[i-1].row(0)*C)*(1+A[i-1].row(0)*D)/(s2+AMAQ[i-1](0,0));
+		Transition3d(A,t[i]-t[i-1],l);
+		AMAQ=A*M*A.transpose()+p2*Q;
+		M=AMAQ-(AMAQ.col(0)*AMAQ.row(0))/(s2+AMAQ(0,0));
+		Vector3d F=AMAQ.col(0)/(s2+AMAQ(0,0));
+		*prec+=(1+A.row(0)*D)*(1+A.row(0)*D)/(s2+AMAQ(0,0));
+		*mean+=(y[i]-A.row(0)*C)*(1+A.row(0)*D)/(s2+AMAQ(0,0));
+		C=A*C-F*A.row(0)*C+F*y[i];
+		D=A*D-F*A.row(0)*D-F;
 	}
-	std::cout << *mean << std::endl;
-	std::cout << *prec << std::endl;
+	*mean/=*prec;
 }
 

@@ -6,7 +6,8 @@ function FFBS(y,μ,σ²,ł,ρ²)
 	end
 	n=length(t)
 	x=zeros(Float64,3*n)
-	ccall((:FFBS3d, "./eigen.so"), Void, (Ref{Cdouble},Ref{Cdouble},Ref{Cdouble},Int32,Float64,Float64,Float64,Float64), y,x,t,n,ł,σ²,ρ²,μ)
+	normals=rand(Normal(0,1),3*n)
+	ccall((:FFBS3d, "./eigen.so"), Void, (Ref{Cdouble},Ref{Cdouble},Ref{Cdouble},Int32,Float64,Float64,Float64,Float64,Ref{Cdouble}), y,x,t,n,ł,σ²,ρ²,μ,normals)
 	if(!all(isfinite(x)))
 		println("outputs to FFBS are not finite")
 	end
@@ -79,3 +80,18 @@ function FFBS2(y,tp,łs,ρ²)
 	return z;
 end
 
+function mu(y,gᵧ,σ²,ł,ρ²,σ²ₘ)
+	t=collect(keys(y));
+	y=collect(values(y));
+	n=length(t)
+	if(gᵧ==1)
+		μmean=zeros(Float64,1)
+		μprec=zeros(Float64,1)
+		ccall((:mu3d, "./eigen.so"), Void, (Ref{Cdouble},Ref{Cdouble},Int32,Float64,Float64,Float64, Ref{Cdouble}, Ref{Cdouble},Float64), y,t,n,σ²,ł,ρ²,μmean,μprec,σ²ₘ)
+		return Normal(μmean[1],sqrt(1.0/μprec[1]))
+	else
+		μprec=1/σ²ₘ+n/σ²
+		μmean=(n/σ²)*mean(y)/μprec
+		return Normal(μmean,sqrt(1.0/μprec))
+	end
+end

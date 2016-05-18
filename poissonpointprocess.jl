@@ -336,6 +336,8 @@ end
 function 𝐺!(trial::ABtrial,σ²,σ²ₘ,łg,ρ²g)
 	(id,Tobs,μg,y₀,y₁,yg,ξ₀ₐᵣ,ξ₀ᵣᵣ,ξ₁ₐᵣ,ξ₁ᵣᵣ,ξ₀ₐₐ,ξ₁ₐₐ,𝑇,g,gᵧ)=params(trial);
 
+
+	trial.μg=rand(mu(trial.yg,trial.gᵧ,σ²,łg,ρ²g,σ²ₘ))
 	logodds=(sslogdensity(yg,1,μg,σ²,łg,ρ²g)-sslogdensity(yg,0,μg,σ²,łg,ρ²g))
 	odds=exp(logodds)
 	if(odds==Inf)
@@ -353,12 +355,6 @@ function 𝐺!(trial::ABtrial,σ²,σ²ₘ,łg,ρ²g)
 			g[key]=zeros(Float64,3)
 		end
 	end
-	n=length(trial.g)
-	mysum=0.0;
-	for key in keys(trial.g)
-		mysum=mysum+trial.yg[key]-trial.g[key][1]
-	end
-	trial.μg=rand(Normal((n/σ²)*(mysum/n)*(1/((n/σ²)+(1/σ²ₘ))),sqrt(1/((n/σ²)+(1/σ²ₘ)))))
 end
 
 function Ξ(trial::ABtrial,μ₀,f₀,ł₀,ρ²₀,μ₁,f₁,ł₁,ρ²₁,łg,ρ²g,Ξₚ)

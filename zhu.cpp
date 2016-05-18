@@ -110,11 +110,6 @@ inline void RevInnovation3d(Matrix3d & Q, double d, double s2u, double s2a){
 
 extern "C" void FFBS3d(double * y, double * xout, double * t, int n, double s2, double s2u, double s2a, double p2, double mu, double * jz, bool approx)
 {
-	if(approx){
-		std::cout << "true" << std::endl;
-	}else{
-		std::cout << "false" << std::endl;
-	}
 	Map<MatrixXd> x(xout,3,n);
 	Map<MatrixXd> Z(jz,3,n);
 	std::vector< Vector3d> m(n);
