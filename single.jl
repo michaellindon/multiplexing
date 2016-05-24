@@ -9,7 +9,7 @@ cd("/home/grad/msl33/Dropbox/pprocess/")
 include("classes.jl")
 include("poissonpointprocess.jl")
 include("statespace.jl")
-include("eigen.jl")
+#=include("eigen.jl")=#
 include("singledatagen.jl")
 #=include("hierdatagen.jl")=#
 #=include("fakerealdata.jl")=#
@@ -29,9 +29,9 @@ y₀=SortedDict(Dict{Float64}{Float64}())
 μ₀=0.0
 empty!(y₀)
 [merge!(y₀,trial.y₀) for trial in Atrials];
-f₀=SortedDict(Dict{Float64,Array{Float64,1}}())
-for key in collect(keys(y₀))
-	f₀[key]=zeros(Float64,3)
+f₀=SortedDict(Dict{Float64,Array{Float64,2}}())
+for key in union(0,collect(keys(y₀)))
+	f₀[key]=zeros(Float64,3,1)
 end
 ρ²₀=9.0
 ł₀=0.1
@@ -63,12 +63,16 @@ srand(2)
 		break
 	end
 	łₚ=ł₀+rand(Normal(0,0.1));
-	if(log(rand(Uniform(0,1)))<sslogdensity(y₀,1.0,μ₀,σ²,statcov(łₚ,ρ²₀),transition(łₚ),innovation(łₚ,ρ²₀))-sslogdensity(y₀,1.0,μ₀,σ²,statcov(ł₀,ρ²₀),transition(ł₀),innovation(ł₀,ρ²₀))+logpdf(Gamma(2,0.5),łₚ)-logpdf(Gamma(2,0.5),ł₀))
-		ł₀=łₚ
+	if(łₚ>0)
+		if(log(rand(Uniform(0,1)))<sslogdensity(y₀,1.0,μ₀,σ²,statcov(łₚ,ρ²₀),transition(łₚ),innovation(łₚ,ρ²₀))-sslogdensity(y₀,1.0,μ₀,σ²,statcov(ł₀,ρ²₀),transition(ł₀),innovation(ł₀,ρ²₀))+logpdf(Gamma(2,0.5),łₚ)-logpdf(Gamma(2,0.5),ł₀))
+			ł₀=łₚ
+		end
 	end
 	ρ²ₚ=ρ²₀+rand(Normal(0,0.1));
-	if(log(rand(Uniform(0,1)))<sslogdensity(y₀,1.0,μ₀,σ²,statcov(ł₀,ρ²ₚ),transition(ł₀),innovation(ł₀,ρ²ₚ))-sslogdensity(y₀,1.0,μ₀,σ²,statcov(ł₀,ρ²₀),transition(ł₀),innovation(ł₀,ρ²₀))+logpdf(Gamma(2,1),ρ²ₚ)-logpdf(Gamma(2,1),ρ²₀))
-		ρ²₀=ρ²ₚ
+	if(ρ²ₚ>0)
+		if(log(rand(Uniform(0,1)))<sslogdensity(y₀,1.0,μ₀,σ²,statcov(ł₀,ρ²ₚ),transition(ł₀),innovation(ł₀,ρ²ₚ))-sslogdensity(y₀,1.0,μ₀,σ²,statcov(ł₀,ρ²₀),transition(ł₀),innovation(ł₀,ρ²₀))+logpdf(Gamma(2,1),ρ²ₚ)-logpdf(Gamma(2,1),ρ²₀))
+			ρ²₀=ρ²ₚ
+		end
 	end
 	#=μ₀=rand(mu(y₀,1,σ²,ł₀,ρ²₀,σ²ₘ))=#
 
@@ -101,7 +105,7 @@ plot(trace["Λ"][1:iter],c="grey")
 
 figure(43)
 subplot(211)
-for i=100:niter
+for i=1:iter
 	plot(collect(keys(trace["f₀"][i])),[trace["Λ"][i]*Φ(trace["μ₀"][i]+trace["f₀"][i][key][1]) for key in collect(keys(trace["f₀"][i]))],c="blue",alpha=0.01)
 end
 
