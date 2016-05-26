@@ -5,13 +5,43 @@ end
 signM=[1.0 ; -1.0  ; 1.0 ; -1.0]
 signM=signM*signM'
 
+function zhuinnovation(σ²ᵤ,σ²ₐ)
+	function zhuinnovation(Δ)
+		Q=zeros(Float64,3,3)
+		Δ²=Δ*Δ; Δ³=Δ²*Δ; Δ⁴=Δ³*Δ; Δ⁵=Δ⁴*Δ;
+		Q[1,1]=(1/20)*Δ⁵*σ²ₐ+(1/3)*Δ³*σ²ᵤ;
+		Q[1,2]=(1/8)*Δ⁴*σ²ₐ+(1/2)*Δ²*σ²ᵤ;
+		Q[1,3]=(1/6)*Δ³*σ²ₐ; 
+		Q[2,1]=(1/8)*Δ⁴*σ²ₐ+(1/2)*Δ²*σ²ᵤ; 
+		Q[2,2]=(1/3)*Δ³*σ²ₐ+Δ*σ²ᵤ;
+		Q[2,3]=(1/2)*Δ²*σ²ₐ;
+		Q[3,1]=(1/6)*Δ³*σ²ₐ;
+		Q[3,2]=(1/2)*Δ²*σ²ₐ;
+		Q[3,3]=Δ*σ²ₐ; 
+		return Q
+	end
+end
+
+function zhutransition(Δ)
+	A=zeros(Float64,3,3)
+	A[1,1]=1;
+	A[1,2]=Δ;
+	A[1,3]=0.5*Δ*Δ;
+	A[2,2]=1;
+	A[2,3]=Δ;
+	A[3,3]=1;
+	return A
+end
+
 function SafeMvNormal(Σ)
+	Σ=0.5*(Σ+Σ')
 	(U,S,V)=svd(Σ)
 	S=map(x->max(0,x),S)
-	U*Diagonal(sqrt(S))*rand(Normal(0,1),3)
+	U*Diagonal(sqrt(S))*rand(Normal(0,1),3,1)
 end
 
 function SafeInv(Σ)
+	Σ=0.5*(Σ+Σ')
 	(U,S,V)=svd(Σ)
 	tolerance=e-10
 	S=map(x->( x>tolerance? 1/x: 0 ),S)
@@ -20,7 +50,7 @@ end
 
 function realization(Cₛ,transition,innovation,t)
 	t=sort(t)
-	x=SortedDict(Dict{Float64,Array{Float64,1}}())
+	x=SortedDict(Dict{Float64,Array{Float64,2}}())
 	x[t[1]]=(SafeMvNormal(Cₛ))
 	#=E,V=eig(Cₛ)=#
 	#=x[t[1]]=V*Diagonal(sqrt(map(x->max(x,0),E)))*rand(Normal(0,1),d,1)=#

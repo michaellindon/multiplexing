@@ -121,6 +121,10 @@ extern "C" void FFBS3d(double * y, double * xout, double * t, int n, double s2, 
 
 	//Stationary Correlation Matrix
 	priorVariance(C);
+	Matrix3d Ao,Qo;
+	Transition3d(Ao,t[0],false);
+	Innovation3d(Qo,t[0],s2u,s2a,false);
+	C=Ao*C*Ao.transpose()+Qo;
 	m[0]=p2*C.col(0)*(y[0]-mu)/(s2+p2*C(0,0));
 	M[0]=p2*C-p2*C.col(0)*C.row(0)*p2/(s2+p2*C(0,0));
 	//Forward Filtering
@@ -244,6 +248,10 @@ extern "C" double LogDensity3d(double * y, double * t, int gamma, int n, double 
 		std::vector< Matrix3d> A(n);
 		Matrix3d C;
 		priorVariance(C);
+	Matrix3d Ao,Qo;
+	Transition3d(Ao,t[0],false);
+	Innovation3d(Qo,t[0],s2u,s2a,false);
+	C=Ao*C*Ao.transpose()+Qo;
 		Matrix3d Q;
 		//Stationary Correlation Matrix
 		m[0]=p2*C.col(0)*(y[0]-mu)/(s2+p2*C(0,0));
@@ -283,6 +291,10 @@ extern "C" void mu3d(double * y, double * t, int n, double s2, double s2u, doubl
 
 	//Stationary Correlation Matrix
 	priorVariance(Cor);
+	Matrix3d Ao,Qo;
+	Transition3d(Ao,t[0],false);
+	Innovation3d(Qo,t[0],s2u,s2a,false);
+	Cor=Ao*Cor*Ao.transpose()+Qo;
 	Vector3d C=p2*Cor.col(0)*(y[0])/(s2+p2*Cor(0,0));
 	Vector3d D=-p2*Cor.col(0)/(s2+p2*Cor(0,0));
 	M[0]=p2*Cor-p2*Cor.col(0)*Cor.row(0)*p2/(s2+p2*Cor(0,0));

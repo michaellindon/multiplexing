@@ -5,7 +5,7 @@ importall PyPlot
 using ProgressMeter
 
 srand(1)
-cd("/home/grad/msl33/Dropbox/pprocess/")
+#=cd("/home/grad/msl33/Dropbox/pprocess/")=#
 include("classes.jl")
 include("poissonpointprocess.jl")
 include("statespace.jl")
@@ -55,31 +55,31 @@ srand(2)
 	Ξₚ=PPProcess(Λ)
 	#Sample Realizations
 	for trial in Atrials
-		Ξ!(trial,μ₀,f₀,transition(ł₀),innovation(ł₀,ρ²₀),Ξₚ)
+		Ξ!(trial,μ₀,f₀,zhutransition,zhuinnovation(ł₀,ρ²₀),Ξₚ)
 	end
 	empty!(y₀)
 	[merge!(y₀,trial.y₀) for trial in Atrials];
 	if(!all(isfinite(collect(values(y₀)))))
 		break
 	end
-	łₚ=ł₀+rand(Normal(0,0.1));
+	łₚ=ł₀+rand(Normal(0,1000));
 	if(łₚ>0)
-		if(log(rand(Uniform(0,1)))<sslogdensity(y₀,1.0,μ₀,σ²,statcov(łₚ,ρ²₀),transition(łₚ),innovation(łₚ,ρ²₀))-sslogdensity(y₀,1.0,μ₀,σ²,statcov(ł₀,ρ²₀),transition(ł₀),innovation(ł₀,ρ²₀))+logpdf(Gamma(2,0.5),łₚ)-logpdf(Gamma(2,0.5),ł₀))
+		if(log(rand(Uniform(0,1)))<sslogdensity(y₀,1.0,μ₀,σ²,1000*eye(3),zhutransition,zhuinnovation(łₚ,ρ²₀))-sslogdensity(y₀,1.0,μ₀,σ²,1000*eye(3),zhutransition,zhuinnovation(ł₀,ρ²₀))+logpdf(Gamma(0.001,1/0.0000001),łₚ)-logpdf(Gamma(0.001,1/0.0000001),ł₀))
 			ł₀=łₚ
 		end
 	end
-	ρ²ₚ=ρ²₀+rand(Normal(0,0.1));
+	ρ²ₚ=ρ²₀+rand(Normal(0,1));
 	if(ρ²ₚ>0)
-		if(log(rand(Uniform(0,1)))<sslogdensity(y₀,1.0,μ₀,σ²,statcov(ł₀,ρ²ₚ),transition(ł₀),innovation(ł₀,ρ²ₚ))-sslogdensity(y₀,1.0,μ₀,σ²,statcov(ł₀,ρ²₀),transition(ł₀),innovation(ł₀,ρ²₀))+logpdf(Gamma(2,1),ρ²ₚ)-logpdf(Gamma(2,1),ρ²₀))
+		if(log(rand(Uniform(0,1)))<sslogdensity(y₀,1.0,μ₀,σ²,1000*eye(3),zhutransition,zhuinnovation(ł₀,ρ²ₚ))-sslogdensity(y₀,1.0,μ₀,σ²,1000*eye(3),zhutransition,zhuinnovation(ł₀,ρ²₀))+logpdf(Gamma(1,1/0.001),ρ²ₚ)-logpdf(Gamma(1,1/0.001),ρ²₀))
 			ρ²₀=ρ²ₚ
 		end
 	end
 	#=μ₀=rand(mu(y₀,1,σ²,ł₀,ρ²₀,σ²ₘ))=#
 
-	f₀=FFBS(y₀,μ₀,σ²,0,statcov(ł₀,ρ²₀),transition(ł₀),innovation(ł₀,ρ²₀))
+	f₀=FFBS(y₀,μ₀,σ²,0,1000*eye(3),zhutransition,zhuinnovation(ł₀,ρ²₀))
 	Λshape=sum(map(x->length(x.ξ₀ₐ)+length(x.ξ₀ᵣ),Atrials))
 	Λrate=sum(map(x->x.Tobs,Atrials))
-	Λ=rand(Gamma(Λshape+0.001,1/(Λrate+0.001)))
+	Λ=rand(Gamma(Λshape+0.00001,1/(Λrate+0.00001)))
 	trace["ρ²₀"][iter]=ρ²₀
 	trace["ł₀"][iter]=ł₀
 	trace["μ₀"][iter]=μ₀
