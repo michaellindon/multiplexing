@@ -1,3 +1,13 @@
+
+
+function ms(y,μ)
+	x=deepcopy(y)
+	for key in keys(x)
+		x[key]=x[key]-μ(key)
+	end
+	return x
+end
+
 function FFBS(y,μ,σ²,ł,ρ²)
 	t=collect(keys(y));
 	y=collect(values(y))
@@ -24,6 +34,13 @@ function sslogdensity(y,gᵧ,μ,σ²,ł,ρ²)
 	y=collect(values(y));
 	n=length(t)
 	return  ccall((:LogDensity3d, "./eigen.so"), Float64, (Ref{Cdouble},Ref{Cdouble},Int32,Int32,Float64,Float64,Float64,Float64), y,t,gᵧ,n,μ,σ²,ł,ρ²)
+end
+
+function mulogdensity(y,gᵧ,σ²,ł,ρ²,σ²ₘ)
+	t=collect(keys(y));
+	y=collect(values(y));
+	n=length(t)
+	return  ccall((:mulogdensity, "./eigen.so"), Float64, (Ref{Cdouble},Ref{Cdouble},Int32,Float64,Float64,Float64,Float64), y,t,n,σ²,ł,ρ²,σ²ₘ)
 end
 
 function oldFFBS2(y,tout,ł,ρ²)

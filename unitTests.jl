@@ -22,12 +22,17 @@ d=p+1
 inputs=collect(0:0.01:1)
 figure()
 K=Kernel(inputs,inputs,ł,ρ²)
-f=realization(ł,ρ²,inputs)
+f=realization(statcov(ł,ρ²),transition(ł),innovation(ł,ρ²),inputs)
+#=f=realization(ł,ρ²,inputs)=#
 μ=10
 y=[f[key][1]+μ+rand(Normal(0,√σ²)) for key in sort(collect(keys(f)))]
 y=convert(Array{Float64},y)
 logpdf(MvNormal(μ*ones(length(y)),σ²*eye(length(y))+K),y)
 sslogdensity(SortedDict(Dict(zip(sort(collect(keys(f))),y))),1.0,μ,σ²,ł,ρ²)
+
+σ²ₘ=1
+mulogdensity(SortedDict(Dict(zip(sort(collect(keys(f))),y))),1.0,σ²,ł,ρ²,σ²ₘ)
+logpdf(MvNormal(zeros(length(y)),σ²*eye(length(y))+K+σ²ₘ*ones(length(y),length(y))),y)
 
 ###marginal mu full conditional###
 σ²ₘ=0.1
@@ -126,16 +131,16 @@ ylim(-5,12)
 ###FFBS2###  ###Cannot compare against the non state space representation###	
 xp=collect(-0.5:0.01:1.5)
 xo=sort(rand(20))
-realization(ł,ρ²,xo)
+#=realization(ł,ρ²,xo)=#
 xc=sort(union(xo,xp))
 figure()
 niter=1000
 for iter=1:niter
 	subplot(211)
-	full=realization(ł,ρ²,xc)
+	full=realization(statcov(ł,ρ²),transition(ł),innovation(ł,ρ²),xc)
 	plot(sort(collect(keys(full))),[full[key][1] for key in sort(collect(keys(full)))],c="blue")
 	subplot(212)
-	half=realization(ł,ρ²,xo)
+	half=realization(statcov(ł,ρ²),transition(ł),innovation(ł,ρ²),xo)
 	full=FFBS2(half,xc,ł,ρ²)
 	plot(sort(collect(keys(full))),[full[key][1] for key in sort(collect(keys(full)))],c="blue")
 end

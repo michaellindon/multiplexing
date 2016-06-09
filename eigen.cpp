@@ -491,3 +491,53 @@ extern "C" void mu3d(double * y, double * t, int n, double s2, double ls, double
 	*mean/=*prec;
 }
 
+extern "C" double mulogdensity(double * y, double * t, int n, double s2, double ls, double p2, double s2m)
+{
+
+
+	Vector3d C;
+	Vector3d D;
+	Matrix3d M;
+	Matrix3d AMAQ;
+	Matrix3d A;
+	Matrix3d Cor;
+	Matrix3d Q;
+	double l=sqrt(5.0)/ls;
+	double l2=l*l;
+	double l3=l*l*l;
+	double l5=l*l*l*l*l;
+	double q=(16.0*l5)/3.0;
+
+	//Stationary Correlation Matrix
+	Cor(0,0)=(3.0*q)/(16.0*l5);
+	Cor(0,1)=0.0;
+	Cor(0,2)=-(q/(16.0*l3));
+	Cor(1,0)=0.0;
+	Cor(1,1)=q/(16.0*l3);
+	Cor(1,2)=0.0;
+	Cor(2,0)=-(q/(16.0*l3));
+	Cor(2,1)=0.0;
+	Cor(2,2)=(3.0*q)/(16.0*l);
+	C=p2*Cor.col(0)*(y[0])/(s2+p2*Cor(0,0));
+	D=-p2*Cor.col(0)/(s2+p2*Cor(0,0));
+	M=p2*Cor-p2*Cor.col(0)*Cor.row(0)*p2/(s2+p2*Cor(0,0));
+	double prec=1.0/s2m;
+	double mean=y[0]/(s2+p2*Cor(0,0));
+	double res=(y[0]*y[0]/(s2+p2*Cor(0,0)));
+	prec+=1.0/(s2+p2*Cor(0,0));
+	double numer=-0.5*log(2*M_PI*(s2+p2*Cor(0,0)));
+	for(int i=1;i<n;++i){
+		Innovation3d(Q,t[i]-t[i-1],l);
+		Transition3d(A,t[i]-t[i-1],l);
+		AMAQ=A*M*A.transpose()+p2*Q;
+		M=AMAQ-(AMAQ.col(0)*AMAQ.row(0))/(s2+AMAQ(0,0));
+		Vector3d F=AMAQ.col(0)/(s2+AMAQ(0,0));
+		prec+=(1+A.row(0)*D)*(1+A.row(0)*D)/(s2+AMAQ(0,0));
+		mean+=(y[i]-A.row(0)*C)*(1+A.row(0)*D)/(s2+AMAQ(0,0));
+		res+=(y[i]-A.row(0)*C)*(y[i]-A.row(0)*C)/(s2+AMAQ(0,0));
+		numer+=-0.5*log(2*M_PI*(s2+AMAQ(0,0)));
+		C=A*C-F*A.row(0)*C+F*y[i];
+		D=A*D-F*A.row(0)*D-F;
+	}
+	return -0.5*log(2*M_PI*s2m)+numer+0.5*log(2*M_PI/prec)-0.5*(res-mean*mean/prec);
+}
