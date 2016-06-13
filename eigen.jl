@@ -40,7 +40,13 @@ function mulogdensity(y,gᵧ,σ²,ł,ρ²,σ²ₘ)
 	t=collect(keys(y));
 	y=collect(values(y));
 	n=length(t)
-	return  ccall((:mulogdensity, "./eigen.so"), Float64, (Ref{Cdouble},Ref{Cdouble},Int32,Float64,Float64,Float64,Float64), y,t,n,σ²,ł,ρ²,σ²ₘ)
+	if(gᵧ==1)
+		return  ccall((:mulogdensity, "./eigen.so"), Float64, (Ref{Cdouble},Ref{Cdouble},Int32,Float64,Float64,Float64,Float64), y,t,n,σ²,ł,ρ²,σ²ₘ)
+	else
+		mm=sum(y)/σ²
+		pp=(n/σ²+1/σ²ₘ)
+		-0.5*n*log(2*pi*σ²)-0.5*log(2*pi*σ²ₘ)+0.5*log(2*pi/pp)-0.5*(dot(y,y)/σ²-mm*mm/pp)
+	end
 end
 
 function oldFFBS2(y,tout,ł,ρ²)
@@ -70,7 +76,7 @@ end
 function FFBS2(y,tp,łs,ρ²)
 	ł=sqrt(5.0)/łs;
 	z=SortedDict(Dict{Float64,Array{Float64,1}}())
-	for t in tp
+	for t in setdiff(tp,collect(keys(y)))
 		𝑍=rand(Normal(0,1),3)
 		xout=zeros(Float64,3)
 		fore=searchsortedlast(y,t); #This routine returns the semitoken of the last item in the container whose key is less than or equal to t. If no such key, then before-start semitoken is returned. 
@@ -92,6 +98,8 @@ function FFBS2(y,tp,łs,ρ²)
 	end
 	for t in tp
 		z[t]=y[t]
+	end
+	for t in setdiff(tp,collect(keys(y)))
 		delete!(y,t)
 	end
 	return z;
