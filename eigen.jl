@@ -105,18 +105,18 @@ function FFBS2(y,tp,łs,ρ²)
 	return z;
 end
 
-function mu(y,gᵧ,σ²,ł,ρ²,σ²ₘ)
+function mu(y,gᵧ,σ²,ł,ρ²,σ²ₘ,μ0)
 	t=collect(keys(y));
 	y=collect(values(y));
 	n=length(t)
 	if(gᵧ==1)
 		μmean=zeros(Float64,1)
 		μprec=zeros(Float64,1)
-		ccall((:mu3d, "./eigen.so"), Void, (Ref{Cdouble},Ref{Cdouble},Int32,Float64,Float64,Float64, Ref{Cdouble}, Ref{Cdouble},Float64), y,t,n,σ²,ł,ρ²,μmean,μprec,σ²ₘ)
+		ccall((:mu3d, "./eigen.so"), Void, (Ref{Cdouble},Ref{Cdouble},Int32,Float64,Float64,Float64, Ref{Cdouble}, Ref{Cdouble},Float64,Float64), y,t,n,σ²,ł,ρ²,μmean,μprec,σ²ₘ,μ0)
 		return Normal(μmean[1],sqrt(1.0/μprec[1]))
 	else
 		μprec=1/σ²ₘ+n/σ²
-		μmean=(n/σ²)*mean(y)/μprec
+		μmean=((n/σ²)*mean(y)+μ0/σ²ₘ)/μprec
 		return Normal(μmean,sqrt(1.0/μprec))
 	end
 end

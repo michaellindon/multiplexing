@@ -29,20 +29,25 @@ y=[f[key][1]+μ+rand(Normal(0,√σ²)) for key in sort(collect(keys(f)))]
 y=convert(Array{Float64},y)
 logpdf(MvNormal(μ*ones(length(y)),σ²*eye(length(y))+K),y)
 sslogdensity(SortedDict(Dict(zip(sort(collect(keys(f))),y))),1.0,μ,σ²,ł,ρ²)
+logpdf(MvNormal(μ*ones(length(y)),σ²*eye(length(y))),y)
+sslogdensity(SortedDict(Dict(zip(sort(collect(keys(f))),y))),0.0,μ,σ²,ł,ρ²)
 
 σ²ₘ=1
 mulogdensity(SortedDict(Dict(zip(sort(collect(keys(f))),y))),1.0,σ²,ł,ρ²,σ²ₘ)
 logpdf(MvNormal(zeros(length(y)),σ²*eye(length(y))+K+σ²ₘ*ones(length(y),length(y))),y)
+mulogdensity(SortedDict(Dict(zip(sort(collect(keys(f))),y))),0.0,σ²,ł,ρ²,σ²ₘ)
+logpdf(MvNormal(zeros(length(y)),σ²*eye(length(y))+σ²ₘ*ones(length(y),length(y))),y)
 
 ###marginal mu full conditional###
 σ²ₘ=0.1
+mean0=3
 oo=ones(length(inputs))
 sqrt((1/(oo'*inv(eye(length(inputs))+K)*oo+1/σ²ₘ)[1])[1])
-((1/(oo'*inv(eye(length(inputs))+K)*oo+1/σ²ₘ)[1])*oo'*inv(eye(length(inputs))+K)*y)[1]
-res=mu(SortedDict(Dict(zip(inputs,y))),1,σ²,ł,ρ²,σ²ₘ)
+((1/(oo'*inv(eye(length(inputs))+K)*oo+1/σ²ₘ)[1])*(oo'*inv(eye(length(inputs))+K)*y+mean0/σ²ₘ))[1]
+res=mu(SortedDict(Dict(zip(inputs,y))),1,σ²,ł,ρ²,σ²ₘ,mean0)
 sqrt((1/(oo'*inv(eye(length(inputs)))*oo+1/σ²ₘ)[1])[1])
-((1/(oo'*inv(eye(length(inputs)))*oo+1/σ²ₘ)[1])*oo'*inv(eye(length(inputs)))*y)[1]
-res=mu(SortedDict(Dict(zip(inputs,y))),0,σ²,ł,ρ²,σ²ₘ)
+((1/(oo'*inv(eye(length(inputs)))*oo+1/σ²ₘ)[1])*(oo'*inv(eye(length(inputs)))*y+mean0/σ²ₘ))[1]
+res=mu(SortedDict(Dict(zip(inputs,y))),0,σ²,ł,ρ²,σ²ₘ,mean0)
 
 
 ###REALIZATION###

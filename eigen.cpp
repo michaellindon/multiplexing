@@ -445,7 +445,7 @@ extern "C" void Predict3d(double * xin, double * tc, int nc, double * xout, doub
 
 
 
-extern "C" void mu3d(double * y, double * t, int n, double s2, double ls, double p2, double * mean, double * prec, double s2m)
+extern "C" void mu3d(double * y, double * t, int n, double s2, double ls, double p2, double * mean, double * prec, double s2m, double mean0)
 {
 
 	Vector3d C;
@@ -475,7 +475,8 @@ extern "C" void mu3d(double * y, double * t, int n, double s2, double ls, double
 	D=-p2*Cor.col(0)/(s2+p2*Cor(0,0));
 	M=p2*Cor-p2*Cor.col(0)*Cor.row(0)*p2/(s2+p2*Cor(0,0));
 	*prec=1.0/s2m;
-	*mean=y[0]/(s2+p2*Cor(0,0));
+	*mean=(1.0/s2m)*mean0;
+	*mean+=y[0]/(s2+p2*Cor(0,0));
 	*prec+=1.0/(s2+p2*Cor(0,0));
 	for(int i=1;i<n;++i){
 		Innovation3d(Q,t[i]-t[i-1],l);

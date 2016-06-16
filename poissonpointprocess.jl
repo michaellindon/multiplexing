@@ -185,13 +185,13 @@ function Y₀Y₁Yg(ξ₀ₐ,ξ₀ᵣ,ξ₁ₐ,ξ₁ᵣ,ξ₀ₐₐ,ξ₀ₐᵣ,
 end
 
 
-function Ξ!(trial::Atrial,μ₀,f₀,ł₀,ρ²₀,Ξₚ)
+function Ξ!(trial::Atrial,μ₀,μ₀ₜ,f₀,ł₀,ρ²₀,Ξₚ)
 	(id,Tobs,y₀,ξ₀ₐ,ξ₀ᵣ)=params(trial)
 	empty!(y₀)
 
 	#ξ₀ₐ
 	for t in keys(ξ₀ₐ)
-		y₀[t]=rand(Truncated(Normal(μ₀+f₀[t][1],1),0,Inf))
+		y₀[t]=rand(Truncated(Normal(μ₀+μ₀ₜ(t)+f₀[t][1],1),0,Inf))
 		ξ₀ₐ[t]["yf"]=y₀[t]
 	end
 
@@ -201,21 +201,21 @@ function Ξ!(trial::Atrial,μ₀,f₀,ł₀,ρ²₀,Ξₚ)
 	empty!(ξ₀ᵣ)
 	sizehint!(ξ₀ᵣ,length(Tₚ))
 	for t in Tₚ
-		if(rand(Bernoulli(1-Φ(μ₀+fₚ[t][1])))[1]==1.0)
-			y₀[t]=rand(Truncated(Normal(μ₀+fₚ[t][1],1),-Inf,0))
+		if(rand(Bernoulli(1-Φ(μ₀+μ₀ₜ(t)+fₚ[t][1])))[1]==1.0)
+			y₀[t]=rand(Truncated(Normal(μ₀+μ₀ₜ(t)+fₚ[t][1],1),-Inf,0))
 			ξ₀ᵣ[t]=Dict{UTF8String,Float64}("yf"=>y₀[t])
 		end
 	end
 
 end
 
-function Ξ!(trial::Btrial,μ₁,f₁,ł₁,ρ²₁,Ξₚ)
+function Ξ!(trial::Btrial,μ₁,μ₁ₜ,f₁,ł₁,ρ²₁,Ξₚ)
 	(id,Tobs,y₁,ξ₁ₐ,ξ₁ᵣ)=params(trial)
 	empty!(y₁)
 
 	#ξ₁ₐ
 	for t in keys(ξ₁ₐ)
-		y₁[t]=rand(Truncated(Normal(μ₁+f₁[t][1],1),0,Inf))
+		y₁[t]=rand(Truncated(Normal(μ₁+μ₁ₜ(t)+f₁[t][1],1),0,Inf))
 		ξ₁ₐ[t]["yf"]=y₁[t]
 	end
 
@@ -225,14 +225,14 @@ function Ξ!(trial::Btrial,μ₁,f₁,ł₁,ρ²₁,Ξₚ)
 	empty!(ξ₁ᵣ)
 	sizehint!(ξ₁ᵣ,length(Tₚ))
 	for t in Tₚ
-		if(rand(Bernoulli(1-Φ(μ₁+fₚ[t][1])))[1]==1.0)
-			y₁[t]=rand(Truncated(Normal(μ₁+fₚ[t][1],1),-Inf,0))
+		if(rand(Bernoulli(1-Φ(μ₁+μ₁ₜ(t)+fₚ[t][1])))[1]==1.0)
+			y₁[t]=rand(Truncated(Normal(μ₁+μ₁ₜ(t)+fₚ[t][1],1),-Inf,0))
 			ξ₁ᵣ[t]=Dict{UTF8String,Float64}("yf"=>y₁[t])
 		end
 	end
 end
 
-function Ξ!(trial::ABtrial,μ₀,f₀,ł₀,ρ²₀,μ₁,f₁,ł₁,ρ²₁,łg,ρ²g,Ξₚ)
+function Ξ!(trial::ABtrial,μ₀,μ₀ₜ,f₀,ł₀,ρ²₀,μ₁,μ₁ₜ,f₁,ł₁,ρ²₁,łg,ρ²g,Ξₚ)
 	(id,Tobs,μg,y₀,y₁,yg,ξ₀ₐᵣ,ξ₀ᵣᵣ,ξ₁ₐᵣ,ξ₁ᵣᵣ,ξ₀ₐₐ,ξ₁ₐₐ,𝑇,g,gᵧ)=params(trial)
 	empty!(y₀)
 	empty!(y₁)
@@ -245,8 +245,8 @@ function Ξ!(trial::ABtrial,μ₀,f₀,ł₀,ρ²₀,μ₁,f₁,ł₁,ρ²₁,ł
 	empty!(ξ₀ₐᵣ)
 	sizehint!(ξ₀ₐᵣ,length(Tₚ))
 	for t in Tₚ
-		if(rand(Bernoulli((1-Φ(μg+gₚ[t][1]))*Φ(μ₀+fₚ[t][1])))[1]==1.0)
-			y₀[t]=rand(Truncated(Normal(μ₀+fₚ[t][1],1),0,Inf))
+		if(rand(Bernoulli((1-Φ(μg+gₚ[t][1]))*Φ(μ₀+μ₀ₜ(t)+fₚ[t][1])))[1]==1.0)
+			y₀[t]=rand(Truncated(Normal(μ₀+μ₀ₜ(t)+fₚ[t][1],1),0,Inf))
 			yg[t]=rand(Truncated(Normal(μg+gₚ[t][1],1),-Inf,0))
 			ξ₀ₐᵣ[t]=Dict{UTF8String,Float64}("yf"=>y₀[t],"yg"=>yg[t])
 		end
@@ -258,8 +258,8 @@ function Ξ!(trial::ABtrial,μ₀,f₀,ł₀,ρ²₀,μ₁,f₁,ł₁,ρ²₁,ł
 	empty!(ξ₀ᵣᵣ)
 	sizehint!(ξ₀ᵣᵣ,length(Tₚ))
 	for t in Tₚ
-		if(rand(Bernoulli(1-Φ(μ₀+fₚ[t][1])))[1]==1.0)
-			y₀[t]=rand(Truncated(Normal(μ₀+fₚ[t][1],1),-Inf,0))
+		if(rand(Bernoulli(1-Φ(μ₀+μ₀ₜ(t)+fₚ[t][1])))[1]==1.0)
+			y₀[t]=rand(Truncated(Normal(μ₀+μ₀ₜ(t)+fₚ[t][1],1),-Inf,0))
 			ξ₀ᵣᵣ[t]=Dict{UTF8String,Float64}("yf"=>y₀[t])
 		end
 	end
@@ -271,8 +271,8 @@ function Ξ!(trial::ABtrial,μ₀,f₀,ł₀,ρ²₀,μ₁,f₁,ł₁,ρ²₁,ł
 	empty!(ξ₁ₐᵣ)
 	sizehint!(ξ₁ₐᵣ,length(Tₚ))
 	for t in Tₚ
-		if(rand(Bernoulli(Φ(μg+gₚ[t][1])*Φ(μ₁+fₚ[t][1])))[1]==1.0)
-			y₁[t]=rand(Truncated(Normal(μ₁+fₚ[t][1],1),0,Inf))
+		if(rand(Bernoulli(Φ(μg+gₚ[t][1])*Φ(μ₁+μ₁ₜ(t)+fₚ[t][1])))[1]==1.0)
+			y₁[t]=rand(Truncated(Normal(μ₁+μ₁ₜ(t)+fₚ[t][1],1),0,Inf))
 			yg[t]=rand(Truncated(Normal(μg+gₚ[t][1],1),0,Inf))
 			ξ₁ₐᵣ[t]=Dict{UTF8String,Float64}("yf"=>y₁[t],"yg"=>yg[t])
 		end
@@ -284,8 +284,8 @@ function Ξ!(trial::ABtrial,μ₀,f₀,ł₀,ρ²₀,μ₁,f₁,ł₁,ρ²₁,ł
 	empty!(ξ₁ᵣᵣ)
 	sizehint!(ξ₁ᵣᵣ,length(Tₚ))
 	for t in Tₚ
-		if(rand(Bernoulli(1-Φ(μ₁+fₚ[t][1])))[1]==1.0)
-			y₁[t]=rand(Truncated(Normal(μ₁+fₚ[t][1],1),-Inf,0))
+		if(rand(Bernoulli(1-Φ(μ₁+μ₁ₜ(t)+fₚ[t][1])))[1]==1.0)
+			y₁[t]=rand(Truncated(Normal(μ₁+μ₁ₜ(t)+fₚ[t][1],1),-Inf,0))
 			ξ₁ᵣᵣ[t]=Dict{UTF8String,Float64}("yf"=>y₁[t])
 		end
 	end
@@ -310,13 +310,13 @@ function Ξ!(trial::ABtrial,μ₀,f₀,ł₀,ρ²₀,μ₁,f₁,ł₁,ρ²₁,ł
 		f₁ₚ=merge(f₁ₚ,f₁)
 	end
 	for t in 𝑇
-		denominator=Φ(μg+g[t][1])*Φ(μ₀+f₀ₚ[t][1])+(1-Φ(μg+g[t][1]))*Φ(μ₁+f₁ₚ[t][1])
-		if(rand(Bernoulli((1-Φ(μg+g[t][1]))*Φ(μ₁+f₁ₚ[t][1])/denominator))[1]==1.0)
-			y₁[t]=rand(Truncated(Normal(μ₁+f₁ₚ[t][1],1),0,Inf))
+		denominator=Φ(μg+g[t][1])*Φ(μ₀+μ₀ₜ(t)+f₀ₚ[t][1])+(1-Φ(μg+g[t][1]))*Φ(μ₁+μ₁ₜ(t)+f₁ₚ[t][1])
+		if(rand(Bernoulli((1-Φ(μg+g[t][1]))*Φ(μ₁+μ₁ₜ(t)+f₁ₚ[t][1])/denominator))[1]==1.0)
+			y₁[t]=rand(Truncated(Normal(μ₁+μ₁ₜ(t)+f₁ₚ[t][1],1),0,Inf))
 			yg[t]=rand(Truncated(Normal(μg+g[t][1],1),-Inf,0))
 			ξ₁ₐₐ[t]=Dict("yf"=>y₁[t], "yg"=>yg[t])
 		else
-			y₀[t]=rand(Truncated(Normal(μ₀+f₀ₚ[t][1],1),0,Inf))
+			y₀[t]=rand(Truncated(Normal(μ₀+μ₀ₜ(t)+f₀ₚ[t][1],1),0,Inf))
 			yg[t]=rand(Truncated(Normal(μg+g[t][1],1),0,Inf))
 			ξ₀ₐₐ[t]=Dict("yf"=>y₀[t], "yg"=>yg[t])
 		end
@@ -333,13 +333,13 @@ function Ξ!(trial::ABtrial,μ₀,f₀,ł₀,ρ²₀,μ₁,f₁,ł₁,ρ²₁,ł
 	)
 end
 
-function 𝐺!(trial::ABtrial,σ²,σ²ₘ,łg,ρ²g)
+function 𝐺!(trial::ABtrial,σ²,σ²ₘ,łg,ρ²g,p)
 	(id,Tobs,μg,y₀,y₁,yg,ξ₀ₐᵣ,ξ₀ᵣᵣ,ξ₁ₐᵣ,ξ₁ᵣᵣ,ξ₀ₐₐ,ξ₁ₐₐ,𝑇,g,gᵧ)=params(trial);
 
 
-	trial.μg=rand(mu(trial.yg,trial.gᵧ,σ²,łg,ρ²g,σ²ₘ))
+	#=trial.μg=rand(mu(trial.yg,trial.gᵧ,σ²,łg,ρ²g,σ²ₘ))=#
 	logodds=(sslogdensity(yg,1,μg,σ²,łg,ρ²g)-sslogdensity(yg,0,μg,σ²,łg,ρ²g))
-	odds=exp(logodds)
+	odds=exp(logodds)*p/(1-p)
 	if(odds==Inf)
 		trial.gᵧ=1
 	elseif(odds==-Inf)
