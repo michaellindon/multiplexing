@@ -233,14 +233,15 @@ function Ξ!(trial::Btrial,μ₁,μ₁ₜ,f₁,ł₁,ρ²₁,Ξₚ)
 end
 
 function Ξ!(trial::ABtrial,μ₀,μ₀ₜ,f₀,ł₀,ρ²₀,μ₁,μ₁ₜ,f₁,ł₁,ρ²₁,łg,ρ²g,Ξₚ)
-	(id,Tobs,μg,y₀,y₁,yg,ξ₀ₐᵣ,ξ₀ᵣᵣ,ξ₁ₐᵣ,ξ₁ᵣᵣ,ξ₀ₐₐ,ξ₁ₐₐ,𝑇,g,gᵧ)=params(trial)
+	(id,Tobs,μg,y₀,y₁,yg,ξ₀ₐᵣ,ξ₀ᵣᵣ,ξ₁ₐᵣ,ξ₁ᵣᵣ,ξ₀ₐₐ,ξ₁ₐₐ,𝑇,g,gᵧ,μprior)=params(trial)
 	empty!(y₀)
 	empty!(y₁)
 	empty!(yg)
 
 	#ξ₀ₐᵣ
 	Tₚ=rand(Ξₚ,0,Tobs)
-	gₚ=FFBS2(g,Tₚ,łg,ρ²g)
+	#=gₚ=FFBS2(g,Tₚ,łg,ρ²g)=#
+	gₚ=(gᵧ==1 ? FFBS2(g,Tₚ,łg,ρ²g) : SortedDict(Dict(map(x->(x,zeros(Float64,3)),Tₚ))))
 	fₚ=FFBS2(f₀,Tₚ,ł₀,ρ²₀)
 	empty!(ξ₀ₐᵣ)
 	sizehint!(ξ₀ₐᵣ,length(Tₚ))
@@ -266,7 +267,8 @@ function Ξ!(trial::ABtrial,μ₀,μ₀ₜ,f₀,ł₀,ρ²₀,μ₁,μ₁ₜ,f�
 
 	#sample ξ₁ₐᵣ
 	Tₚ=rand(Ξₚ,0,Tobs)
-	gₚ=FFBS2(g,Tₚ,łg,ρ²g)
+	#=gₚ=FFBS2(g,Tₚ,łg,ρ²g)=#
+	gₚ=(gᵧ==1 ? FFBS2(g,Tₚ,łg,ρ²g) : SortedDict(Dict(map(x->(x,zeros(Float64,3)),Tₚ))))
 	fₚ=FFBS2(f₁,Tₚ,ł₁,ρ²₁)
 	empty!(ξ₁ₐᵣ)
 	sizehint!(ξ₁ₐᵣ,length(Tₚ))
@@ -334,10 +336,9 @@ function Ξ!(trial::ABtrial,μ₀,μ₀ₜ,f₀,ł₀,ρ²₀,μ₁,μ₁ₜ,f�
 end
 
 function 𝐺!(trial::ABtrial,σ²,σ²ₘ,łg,ρ²g,p)
-	(id,Tobs,μg,y₀,y₁,yg,ξ₀ₐᵣ,ξ₀ᵣᵣ,ξ₁ₐᵣ,ξ₁ᵣᵣ,ξ₀ₐₐ,ξ₁ₐₐ,𝑇,g,gᵧ)=params(trial);
+	(id,Tobs,μg,y₀,y₁,yg,ξ₀ₐᵣ,ξ₀ᵣᵣ,ξ₁ₐᵣ,ξ₁ᵣᵣ,ξ₀ₐₐ,ξ₁ₐₐ,𝑇,g,gᵧ,μprior)=params(trial);
 
-
-	#=trial.μg=rand(mu(trial.yg,trial.gᵧ,σ²,łg,ρ²g,σ²ₘ))=#
+	trial.μg=rand(mu(trial.yg,trial.gᵧ,σ²,łg,ρ²g,σ²ₘ,trial.μprior))
 	logodds=(sslogdensity(yg,1,μg,σ²,łg,ρ²g)-sslogdensity(yg,0,μg,σ²,łg,ρ²g))
 	odds=exp(logodds)*p/(1-p)
 	if(odds==Inf)
