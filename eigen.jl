@@ -76,7 +76,8 @@ end
 function FFBS2(y,tp,łs,ρ²)
 	ł=sqrt(5.0)/łs;
 	z=SortedDict(Dict{Float64,Array{Float64,1}}())
-	for t in setdiff(tp,collect(keys(y)))
+	predictpoints=setdiff(tp,collect(keys(y)))
+	for t in predictpoints
 		𝑍=rand(Normal(0,1),3)
 		xout=zeros(Float64,3)
 		fore=searchsortedlast(y,t); #This routine returns the semitoken of the last item in the container whose key is less than or equal to t. If no such key, then before-start semitoken is returned. 
@@ -99,7 +100,7 @@ function FFBS2(y,tp,łs,ρ²)
 	for t in tp
 		z[t]=y[t]
 	end
-	for t in setdiff(tp,collect(keys(y)))
+	for t in predictpoints
 		delete!(y,t)
 	end
 	return z;
