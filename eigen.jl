@@ -10,7 +10,9 @@ end
 
 function FFBS(y,μ,σ²,ł,ρ²)
 	t=collect(keys(y));
+	t=convert(Array{Float64},t)
 	y=collect(values(y))
+	y=convert(Array{Float64},y)
 	if(!all(isfinite(y)))
 		println("inputs to FFBS are not finite")
 	end
@@ -31,7 +33,9 @@ end
 
 function sslogdensity(y,gᵧ,μ,σ²,ł,ρ²)
 	t=collect(keys(y));
+	t=convert(Array{Float64},t)
 	y=collect(values(y));
+	y=convert(Array{Float64},y)
 	n=length(t)
 	return  ccall((:LogDensity3d, "./eigen.so"), Float64, (Ref{Cdouble},Ref{Cdouble},Int32,Int32,Float64,Float64,Float64,Float64), y,t,gᵧ,n,μ,σ²,ł,ρ²)
 end
@@ -108,7 +112,9 @@ end
 
 function mu(y,gᵧ,σ²,ł,ρ²,σ²ₘ,μ0)
 	t=collect(keys(y));
+	t=convert(Array{Float64},t)
 	y=collect(values(y));
+	y=convert(Array{Float64},y) 
 	n=length(t)
 	if(gᵧ==1)
 		μmean=zeros(Float64,1)
