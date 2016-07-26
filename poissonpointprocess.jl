@@ -232,113 +232,49 @@ function Ξ!(trial::Btrial,μ₁,μ₁ₜ,f₁,ł₁,ρ²₁,Ξₚ)
 	end
 end
 
-function Ξ!(trial::ABtrial,μ₀,μ₀ₜ,f₀,ł₀,ρ²₀,μ₁,μ₁ₜ,f₁,ł₁,ρ²₁,łg,ρ²g,Ξₚ)
-	(id,Tobs,μg,y₀,y₁,yg,ξ₀ₐᵣ,ξ₀ᵣᵣ,ξ₁ₐᵣ,ξ₁ᵣᵣ,ξ₀ₐₐ,ξ₁ₐₐ,𝑇,g,gᵧ,μprior)=params(trial)
+function Ξ!(trial::ABtrial,m₀,λ₀,m₁,λ₁,łg,ρ²g,Λ)
+	(id,Tobs,μg,y₀,y₁,yg,ξ₀ₐᵣ,ξ₀ᵣᵣ,ξ₁ₐᵣ,ξ₁ᵣᵣ,ξ₀ₐₐ,ξ₁ₐₐ,𝑇,gg,gᵧ,μprior)=params(trial)
 	empty!(y₀)
 	empty!(y₁)
 	empty!(yg)
 
-	#ξ₀ₐᵣ
-	Tₚ=rand(Ξₚ,0,Tobs)
-	#gₚ=FFBS2(g,Tₚ,łg,ρ²g)
-	gₚ=(gᵧ==1 ? FFBS2(g,Tₚ,łg,ρ²g) : SortedDict(Dict(map(x->(x,zeros(Float64,3)),Tₚ))))
-	fₚ=FFBS2(f₀,Tₚ,ł₀,ρ²₀)
-	#=empty!(ξ₀ₐᵣ)=#
-	#=sizehint!(ξ₀ₐᵣ,length(Tₚ))=#
-	for t in Tₚ
-		if(rand(Bernoulli((1-Φ(μg+gₚ[t][1]))*Φ(μ₀+μ₀ₜ(t)+fₚ[t][1])))[1]==1.0)
-			y₀[t]=rand(Truncated(Normal(μ₀+μ₀ₜ(t)+fₚ[t][1],1),0,Inf))
-			yg[t]=rand(Truncated(Normal(μg+gₚ[t][1],1),-Inf,0))
-			#=ξ₀ₐᵣ[t]=Dict{UTF8String,Float64}("yf"=>y₀[t],"yg"=>yg[t])=#
-		end
+	g=lazyGP(gg,łg)
+
+	mₐ = x->μg+g(x)
+	α = x->Φ(mₐ(x))
+	
+	ξ₀ₐᵣ=rand(PPProcess(x->(1-α(x))*λ₀(x),Λ),0,Tobs)
+	for t in ξ₀ₐᵣ
+			y₀[t]=rand(Truncated(Normal(m₀(t),1),0,Inf))
+			yg[t]=rand(Truncated(Normal(mₐ(t),1),-Inf,0))
 	end
 
-	#ξ₀ᵣᵣ
-	Tₚ=rand(Ξₚ,0,Tobs)
-	fₚ=FFBS2(f₀,Tₚ,ł₀,ρ²₀)
-	#=empty!(ξ₀ᵣᵣ)=#
-	#=sizehint!(ξ₀ᵣᵣ,length(Tₚ))=#
-	for t in Tₚ
-		if(rand(Bernoulli(1-Φ(μ₀+μ₀ₜ(t)+fₚ[t][1])))[1]==1.0)
-			y₀[t]=rand(Truncated(Normal(μ₀+μ₀ₜ(t)+fₚ[t][1],1),-Inf,0))
-			#=ξ₀ᵣᵣ[t]=Dict{UTF8String,Float64}("yf"=>y₀[t])=#
-		end
+	ξ₀ᵣᵣ=rand(PPProcess(x-> Λ-λ₀(x),Λ),0,Tobs)
+	for t in ξ₀ᵣᵣ
+			y₀[t]=rand(Truncated(Normal(m₀(t),1),-Inf,0))
 	end
 
-	#sample ξ₁ₐᵣ
-	Tₚ=rand(Ξₚ,0,Tobs)
-	#gₚ=FFBS2(g,Tₚ,łg,ρ²g)
-	gₚ=(gᵧ==1 ? FFBS2(g,Tₚ,łg,ρ²g) : SortedDict(Dict(map(x->(x,zeros(Float64,3)),Tₚ))))
-	fₚ=FFBS2(f₁,Tₚ,ł₁,ρ²₁)
-	#=empty!(ξ₁ₐᵣ)=#
-	#=sizehint!(ξ₁ₐᵣ,length(Tₚ))=#
-	for t in Tₚ
-		if(rand(Bernoulli(Φ(μg+gₚ[t][1])*Φ(μ₁+μ₁ₜ(t)+fₚ[t][1])))[1]==1.0)
-			y₁[t]=rand(Truncated(Normal(μ₁+μ₁ₜ(t)+fₚ[t][1],1),0,Inf))
-			yg[t]=rand(Truncated(Normal(μg+gₚ[t][1],1),0,Inf))
-			#=ξ₁ₐᵣ[t]=Dict{UTF8String,Float64}("yf"=>y₁[t],"yg"=>yg[t])=#
-		end
+	ξ₁ₐᵣ=rand(PPProcess(x-> α(x)*λ₁(x),Λ),0,Tobs)
+	for t in ξ₁ₐᵣ
+			y₁[t]=rand(Truncated(Normal(m₁(t),1),0,Inf))
+			yg[t]=rand(Truncated(Normal(mₐ(t),1),0,Inf))
 	end
 
-	#sample ξ₁ᵣᵣ
-	Tₚ=rand(Ξₚ,0,Tobs)
-	fₚ=FFBS2(f₁,Tₚ,ł₁,ρ²₁)
-	#=empty!(ξ₁ᵣᵣ)=#
-	#=sizehint!(ξ₁ᵣᵣ,length(Tₚ))=#
-	for t in Tₚ
-		if(rand(Bernoulli(1-Φ(μ₁+μ₁ₜ(t)+fₚ[t][1])))[1]==1.0)
-			y₁[t]=rand(Truncated(Normal(μ₁+μ₁ₜ(t)+fₚ[t][1],1),-Inf,0))
-			#=ξ₁ᵣᵣ[t]=Dict{UTF8String,Float64}("yf"=>y₁[t])=#
-		end
+	ξ₁ᵣᵣ=rand(PPProcess(x-> Λ-λ₁(x),Λ),0,Tobs)
+	for t in ξ₁ᵣᵣ
+			y₁[t]=rand(Truncated(Normal(m₁(t),1),-Inf,0))
 	end
 
-	#sample ξ₀ₐₐ, ξ₁ₐₐ
-	#=empty!(ξ₀ₐₐ)=#
-	#=sizehint!(ξ₀ₐₐ,length(𝑇))=#
-	#=empty!(ξ₁ₐₐ)=#
-	#=sizehint!(ξ₁ₐₐ,length(𝑇))=#
-	Tₚ=setdiff(𝑇,collect(keys(f₀)))
-	if(isempty(Tₚ))
-		f₀ₚ=copy(f₀)
-	else
-		f₀ₚ=FFBS2(f₀,Tₚ,ł₀,ρ²₀)
-		f₀ₚ=merge(f₀ₚ,f₀)
-	end
-	Tₚ=setdiff(𝑇,collect(keys(f₁)))
-	if(isempty(Tₚ))
-		f₁ₚ=copy(f₁)
-	else
-		f₁ₚ=FFBS2(f₁,Tₚ,ł₁,ρ²₁)
-		f₁ₚ=merge(f₁ₚ,f₁)
-	end
 	for t in 𝑇
-		denominator=Φ(μg+g[t][1])*Φ(μ₀+μ₀ₜ(t)+f₀ₚ[t][1])+(1-Φ(μg+g[t][1]))*Φ(μ₁+μ₁ₜ(t)+f₁ₚ[t][1])
-		if(rand(Bernoulli((1-Φ(μg+g[t][1]))*Φ(μ₁+μ₁ₜ(t)+f₁ₚ[t][1])/denominator))[1]==1.0)
-			y₁[t]=rand(Truncated(Normal(μ₁+μ₁ₜ(t)+f₁ₚ[t][1],1),0,Inf))
-			yg[t]=rand(Truncated(Normal(μg+g[t][1],1),-Inf,0))
-			#=ξ₁ₐₐ[t]=Dict("yf"=>y₁[t], "yg"=>yg[t])=#
+		denominator=α(t)*λ₀(t)+(1-α(t))*λ₁(t)
+		if(rand(Bernoulli((1-α(t))*λ₁(t)/(denominator)))[1]==1.0)
+			y₁[t]=rand(Truncated(Normal(m₁(t),1),0,Inf))
+			yg[t]=rand(Truncated(Normal(mₐ(t),1),-Inf,0))
 		else
-			y₀[t]=rand(Truncated(Normal(μ₀+μ₀ₜ(t)+f₀ₚ[t][1],1),0,Inf))
-			yg[t]=rand(Truncated(Normal(μg+g[t][1],1),0,Inf))
-			#=ξ₀ₐₐ[t]=Dict("yf"=>y₀[t], "yg"=>yg[t])=#
+			y₀[t]=rand(Truncated(Normal(m₀(t),1),0,Inf))
+			yg[t]=rand(Truncated(Normal(mₐ(t),1),0,Inf))
 		end
 	end
-	#=trial.y₀=merge(=#
-	#=SortedDict(Dict(zip(sort(collect(keys(ξ₀ₐᵣ))),[ξ₀ₐᵣ[key]["yf"] for key in sort(collect(keys(ξ₀ₐᵣ)))]))),=#
-	#=SortedDict(Dict(zip(sort(collect(keys(ξ₀ᵣᵣ))),[ξ₀ᵣᵣ[key]["yf"] for key in sort(collect(keys(ξ₀ᵣᵣ)))]))),=#
-	#=SortedDict(Dict(zip(sort(collect(keys(ξ₀ₐₐ))),[ξ₀ₐₐ[key]["yf"] for key in sort(collect(keys(ξ₀ₐₐ)))])))=#
-	#=)=#
-	#=trial.y₁=merge(=#
-	#=SortedDict(Dict(zip(sort(collect(keys(ξ₁ₐᵣ))),[ξ₁ₐᵣ[key]["yf"] for key in sort(collect(keys(ξ₁ₐᵣ)))]))),=#
-	#=SortedDict(Dict(zip(sort(collect(keys(ξ₁ᵣᵣ))),[ξ₁ᵣᵣ[key]["yf"] for key in sort(collect(keys(ξ₁ᵣᵣ)))]))),=#
-	#=SortedDict(Dict(zip(sort(collect(keys(ξ₁ₐₐ))),[ξ₁ₐₐ[key]["yf"] for key in sort(collect(keys(ξ₁ₐₐ)))])))=#
-	#=)=#
-	#=trial.yg=merge(=#
-	#=SortedDict(Dict(zip(sort(collect(keys(ξ₁ₐᵣ))),[ξ₁ₐᵣ[key]["yg"] for key in sort(collect(keys(ξ₁ₐᵣ)))]))),=#
-	#=SortedDict(Dict(zip(sort(collect(keys(ξ₁ₐₐ))),[ξ₁ₐₐ[key]["yg"] for key in sort(collect(keys(ξ₁ₐₐ)))]))),=#
-	#=SortedDict(Dict(zip(sort(collect(keys(ξ₀ₐᵣ))),[ξ₀ₐᵣ[key]["yg"] for key in sort(collect(keys(ξ₀ₐᵣ)))]))),=#
-	#=SortedDict(Dict(zip(sort(collect(keys(ξ₀ₐₐ))),[ξ₀ₐₐ[key]["yg"] for key in sort(collect(keys(ξ₀ₐₐ)))])))=#
-	#=)=#
 end
 
 function 𝐺!(trial::ABtrial,σ²,σ²ₘ,łg,ρ²g,p)
@@ -474,19 +410,4 @@ function lazyGP(f,łs)
 		return f[t][1]
 	end
 end
-
-
-invec=ones(3)
-function mycl(invec)
-	state=invec
-	function coutner()
-		state=state+1
-	end
-end
-
-λ₀ = x-> Λ*Φ(μ₀+μ₀ₜ(x)+testf(x))
-λ₁ = x-> Λ*Φ(μ₁+μ₁ₜ(x)+f₁(x))
-α = x-> Φ(μg+g(x))
-
-@time rand(PPProcess(λ₀,Λ),0,1)
 
