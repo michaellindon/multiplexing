@@ -37,7 +37,7 @@ function SafeMvNormal(Σ)
 	Σ=0.5*(Σ+Σ')
 	(U,S,V)=svd(Σ)
 	S=map(x->max(0,x),S)
-	U*Diagonal(sqrt(S))*rand(Normal(0,1),3,1)
+	U*Diagonal(sqrt(S))*rand(Normal(0,1),3)
 end
 
 function SafeInv(Σ)
@@ -50,7 +50,7 @@ end
 
 function realization(Cₛ,transition,innovation,t)
 	t=sort(t)
-	x=SortedDict(Dict{Float64,Array{Float64,2}}())
+	x=SortedDict(Dict{Float64,Array{Float64,1}}())
 	x[t[1]]=(SafeMvNormal(Cₛ))
 	#=E,V=eig(Cₛ)=#
 	#=x[t[1]]=V*Diagonal(sqrt(map(x->max(x,0),E)))*rand(Normal(0,1),d,1)=#
