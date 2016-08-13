@@ -19,13 +19,23 @@ cell=cells["YKIC140130Loc_DoubleSound"]
 
 fooA=SortedDict(Dict(zip(collect(0:0.005:1),cell["A"]["mean"])))
 fooB=SortedDict(Dict(zip(collect(0:0.005:1),(cell["B"]["mean"]))))
-μ₀ₜ(t)=invlogcdf(Normal(0,1),log((1/Λ)*deref((fooA,searchsortedlast(fooA,t)))[2]))
-μ₁ₜ(t)=invlogcdf(Normal(0,1),log((1/Λ)*(deref((fooB,searchsortedlast(fooB,t)))[2])))
+μ₀(t)=invlogcdf(Normal(0,1),log((1/Λ)*deref((fooA,searchsortedlast(fooA,t)))[2]))
+μ₁(t)=invlogcdf(Normal(0,1),log((1/Λ)*(deref((fooB,searchsortedlast(fooB,t)))[2])))
+ρ²₀=cell["A"]["variance"]
+ρ²₁=cell["B"]["variance"]
 
 
-niter=1000
+
+Atrials=map(trial->filter(z->z>0,trial)/1000,map(y->azeem[1][3]["TIMES"][find(x-> x==y,azeem[1][3]["TRIAL2"])],1:50))
+Btrials=map(trial->filter(z->z>0,trial)/1000,map(y->azeem[1][3]["TIMES"][find(x-> x==y,azeem[1][3]["TRIAL2"])],51:100))
+ABtrials=map(trial->filter(z->z>0,trial)/1000,map(y->azeem[1][3]["TIMES"][find(x-> x==y,azeem[1][3]["TRIAL2"])],101:150))
+Atrials=[Atrial(1,trial,1) for trial in Atrials]
+Btrials=[Btrial(1,trial,1) for trial in Btrials]
+ABtrials=[ABtrial(1,trial,1) for trial in ABtrials]
+μ₀,μ₁,Λ,ρ²₀,ρ²₁=preprocess(Atrials,Btrials)
+
+niter=10000
 iter=1
-σ²ₘ=9
 k=0.1
 a=1
 σ²=1.0
@@ -34,34 +44,12 @@ y₀=SortedDict(Dict{Float64}{Float64}())
 y₁=SortedDict(Dict{Float64}{Float64}())
 
 
-#initial values
-μ₀=0.0
-μ₁=0.0
-empty!(y₀)
-[merge!(y₀,trial.y₀) for trial in ABtrials];
-f₀=SortedDict(Dict{Float64,Array{Float64,1}}())
-for key in collect(keys(y₀))
-	f₀[key]=zeros(Float64,3)
-end
-empty!(y₁)
-[merge!(y₁,trial.y₁) for trial in ABtrials];
-f₁=SortedDict(Dict{Float64,Array{Float64,1}}())
-for key in collect(keys(y₁))
-	f₁[key]=zeros(Float64,3)
-end
-ł₀=0.1
-ł₁=0.1
-p=0.5
-łg=30.0
-ρ²₀=cell["A"]["variance"]
-ρ²₁=cell["B"]["variance"]
-ρ²g=3.0
+μ₀ = x->0
+μ₁ = x->0
+ρ²₀=1
+ρ²₁=1
 
 trace=Dict()
-trace["ABtrials"]=Dict()
-for i=1:length(ABtrials)
-	trace["ABtrials"][i]=zeros(Int64,niter)
-end
 trace["ρ²g"]=zeros(Float64,niter)
 trace["p"]=zeros(Float64,niter)
 trace["ρ²₀"]=zeros(Float64,niter)
@@ -69,263 +57,159 @@ trace["ρ²₁"]=zeros(Float64,niter)
 trace["łg"]=zeros(Float64,niter)
 trace["ł₀"]=zeros(Float64,niter)
 trace["ł₁"]=zeros(Float64,niter)
-trace["μ₀"]=zeros(Float64,niter)
-trace["μ₁"]=zeros(Float64,niter)
 trace["Λ"]=zeros(Float64,niter)
 trace["μ₀+f₀"]=zeros(Float64,niter)
 trace["λ₀"]=Dict()
+trace["μ₀bar"]=Dict()
+trace["μ₁bar"]=Dict()
 trace["λ₁"]=Dict()
 trace["g"]=Dict()
 trace["μg"]=Dict()
+trace["ABtrials"]=Dict()
 trace["μprior"]=Dict()
-srand(2)
-ftmp₀=lazyGP(f₀,ł₀)
-m₀ = x -> μ₀ₜ(x)+ftmp₀(x)
-λ₀= x-> Λ*Φ(m₀(x))
-ftmp₁=lazyGP(f₁,ł₁)
-m₁ = x-> μ₁ₜ(x)+ftmp₁(x)
-λ₁ = x-> Λ*Φ(m₁(x))
-trueABtrials=deepcopy(ABtrials)
+trace[:α]=Dict()
+trace[:g]=Dict()
+trace[:μg]=Dict()
+trace[:gᵧ]=Dict()
+λ₀ = x->Λ
+λ₁ = x->Λ
+m₀ = x->0
+m₁ = x->0
+ł₀=1
+ł₁=1
+łg=1
+ρ²g=1
+σ²ₘ=100
+k=0.1
+a=1
+p=0.5
+prior=Dict(:p => Beta(1,1), :ł₀ => Gamma(2,1), :ρ²₀ => Gamma(1,1) ,:ł₁ => Gamma(2,1),:ρ²₁ => Gamma(1,1) ,:łg => Gamma(5,5/100),:ρ²g => Gamma(2,1) ,:μg => Normal(0,sqrt(3)))
+#=trueABtrials=deepcopy(ABtrials)=#
 @showprogress 5 "Computing..." for iter=1:niter
 
 	#Sample Realizations
+	for trial in Atrials
+		Ξ!(trial,m₀,λ₀,Λ)
+	end
+	for trial in Btrials
+		Ξ!(trial,m₁,λ₁,Λ)
+	end
 	for trial in ABtrials
-		Ξ!(trial,m₀,λ₀,m₁,λ₁,łg,ρ²g,Λ)
+		Ξ!(trial,m₀,λ₀,m₁,λ₁,Λ)
 	end
 
-	empty!(y₀)
-	[merge!(y₀,trial.y₀) for trial in ABtrials];
+	y₀=reduce(merge,map(x->x.y₀,[Atrials;ABtrials]))
 	łₚ=ł₀+rand(Normal(0,0.1));
-	if(log(rand(Uniform(0,1)))<sslogdensity(ms(y₀,μ₀ₜ),1.0,μ₀,σ²,łₚ,ρ²₀)-sslogdensity(ms(y₀,μ₀ₜ),1.0,μ₀,σ²,ł₀,ρ²₀)+logpdf(Gamma(2,0.5),łₚ)-logpdf(Gamma(2,0.5),ł₀))
-		ł₀=łₚ
-	end
+	ł₀= (log(rand(Uniform(0,1))) < -(map(z->sslogdensity(ms(y₀,μ₀),1,0,σ²,z,ρ²₀)+logpdf(prior[:ł₀],z),[łₚ,ł₀])...)) ?  łₚ : ł₀
 	ρ²ₚ=ρ²₀+rand(Normal(0,0.1));
-	if(log(rand(Uniform(0,1)))<sslogdensity(ms(y₀,μ₀ₜ),1.0,μ₀,σ²,ł₀,ρ²ₚ)-sslogdensity(ms(y₀,μ₀ₜ),1.0,μ₀,σ²,ł₀,ρ²₀)+logpdf(Gamma(1,1/100),ρ²ₚ)-logpdf(Gamma(1,1/100),ρ²₀))
-		ρ²₀=ρ²ₚ
-	end
-	f₀=lazyGP(FFBS(ms(y₀,μ₀ₜ),μ₀,σ²,ł₀,ρ²₀),ł₀)
-	m₀= x->μ₀ₜ(x)+f₀(x)
+	ρ²₀= (log(rand(Uniform(0,1))) < -(map(z->sslogdensity(ms(y₀,μ₀),1,0,σ²,ł₀,z)+logpdf(prior[:ρ²₀],z),[ρ²ₚ,ρ²₀])...)) ? ρ²ₚ : ρ²₀
+	μ₀bar = rand(mu(y₀,1,σ²,ł₀,ρ²₀,σ²ₘ,0))
+	μ₀ = x-> μ₀bar 
+	f₀=lazyGP(FFBS(ms(y₀,μ₀),0,σ²,ł₀,ρ²₀),ł₀)
+	m₀= x->μ₀(x)+f₀(x)
 	λ₀= x-> Λ*Φ(m₀(x))
 
-	empty!(y₁)
-	[merge!(y₁,trial.y₁) for trial in ABtrials];
+	y₁=reduce(merge,map(x->x.y₁,[Btrials;ABtrials]))
 	łₚ=ł₁+rand(Normal(0,0.1));
-	if(log(rand(Uniform(0,1)))<sslogdensity(ms(y₁,μ₁ₜ),1.0,μ₁,σ²,łₚ,ρ²₁)-sslogdensity(ms(y₁,μ₁ₜ),1.0,μ₁,σ²,ł₁,ρ²₁)+logpdf(Gamma(2,0.5),łₚ)-logpdf(Gamma(2,0.5),ł₁))
-		ł₁=łₚ
-	end
+	ł₁= (log(rand(Uniform(0,1))) < -(map(z->sslogdensity(ms(y₁,μ₁),1,0,σ²,z,ρ²₁)+logpdf(prior[:ł₁],z),[łₚ,ł₁])...)) ? łₚ : ł₁
 	ρ²ₚ=ρ²₁+rand(Normal(0,0.1));
-	if(log(rand(Uniform(0,1)))<sslogdensity(ms(y₁,μ₁ₜ),1.0,μ₁,σ²,ł₁,ρ²ₚ)-sslogdensity(ms(y₁,μ₁ₜ),1.0,μ₁,σ²,ł₁,ρ²₁)+logpdf(Gamma(1,1/100),ρ²ₚ)-logpdf(Gamma(1,1/100),ρ²₁))
-		ρ²₁=ρ²ₚ
-	end
-	f₁=lazyGP(FFBS(ms(y₁,μ₁ₜ),μ₁,σ²,ł₁,ρ²₁),ł₁)
-	m₁= x->μ₁ₜ(x)+f₁(x)
+	ρ²₁= (log(rand(Uniform(0,1))) < -(map(z->sslogdensity(ms(y₁,μ₁),1,0,σ²,ł₁,z)+logpdf(prior[:ρ²₁],z),[ρ²ₚ,ρ²₁])...)) ? ρ²ₚ : ρ²₁
+	μ₁bar = rand(mu(y₁,1,σ²,ł₁,ρ²₁,σ²ₘ,0))
+	μ₁ = x -> μ₁bar
+	f₁=lazyGP(FFBS(ms(y₁,μ₁),0,σ²,ł₁,ρ²₁),ł₁)
+	m₁= x->μ₁(x)+f₁(x)
 	λ₁ = x-> Λ*Φ(m₁(x))
 
-	for trial in ABtrials
-		mulist=map(x->x.μprior,ABtrials)
-		weights=map(x->logpdf(Normal(x,sqrt(k*σ²ₘ)),trial.μg),mulist)
-		indx=find(map(x->x.id==trial.id,ABtrials))[1]
-		weights[indx]=logpdf(Normal(0,sqrt((1+k)*σ²ₘ)),trial.μg)
-		weights=exp(weights-maximum(weights))
-		weights[indx]=weights[indx]*a
-		weights=weights/sum(weights)
-		sindx=rand(Categorical(weights))
-		if(indx==sindx)
-			trial.μprior=rand(Normal((1/(1/(k*σ²ₘ) + 1/σ²ₘ))*(trial.μg/(k*σ²ₘ)),sqrt(1/(1/(k*σ²ₘ) + (1/σ²ₘ))) ))
-		else
-			trial.μprior=mulist[sindx]
-		end
-	end
+	#=for trial in ABtrials=#
+		#=mulist=map(x->x.μprior,ABtrials)=#
+		#=weights=map(x->logpdf(Normal(x,sqrt(k*σ²ₘ)),trial.μg),mulist)=#
+		#=indx=find(map(x->x.id==trial.id,ABtrials))[1]=#
+		#=weights[indx]=logpdf(Normal(0,sqrt((1+k)*σ²ₘ)),trial.μg)=#
+		#=weights=exp(weights-maximum(weights))=#
+		#=weights[indx]=weights[indx]*a=#
+		#=weights=weights/sum(weights)=#
+		#=sindx=rand(Categorical(weights))=#
+		#=if(indx==sindx)=#
+			#=trial.μprior=rand(Normal((1/(1/(k*σ²ₘ) + 1/σ²ₘ))*(trial.μg/(k*σ²ₘ)),sqrt(1/(1/(k*σ²ₘ) + (1/σ²ₘ))) ))=#
+		#=else=#
+			#=trial.μprior=mulist[sindx]=#
+		#=end=#
+	#=end=#
 
 	for trial in ABtrials
 		𝐺!(trial,σ²,k*σ²ₘ,łg,ρ²g,p)
 	end
 	p=rand(Beta(1+sum(map(x->x.gᵧ,ABtrials)),1+length(ABtrials)-sum(map(x->x.gᵧ,ABtrials))))
-	łgₚ=łg+rand(Normal(0,0.5));
-	if(log(rand(Uniform(0,1)))<sum([sslogdensity(trial,σ²,łgₚ,ρ²g) for trial in ABtrials])-sum([sslogdensity(trial,σ²,łg,ρ²g) for trial in ABtrials])+logpdf(Gamma(1,1/5),łgₚ)-logpdf(Gamma(1,1/5),łg))
-		łg=łgₚ
-	end
-	ρ²gₚ=ρ²g+rand(Normal(0,0.5));
-	if(log(rand(Uniform(0,1)))<sum([sslogdensity(trial,σ²,łg,ρ²gₚ) for trial in ABtrials])-sum([sslogdensity(trial,σ²,łg,ρ²g) for trial in ABtrials])+logpdf(Gamma(3,1),ρ²gₚ)-logpdf(Gamma(3,1),ρ²g))
-		ρ²g=ρ²gₚ
+	if(any(map(x->x.gᵧ==1,ABtrials)))
+		łgₚ=łg+rand(Normal(0,0.5));
+		łg=(log(rand(Uniform(0,1))) < -(map(z->logpdf(prior[:łg],z)+sum(map(x->sslogdensity(x.yg,1,x.μg,σ²,z,ρ²g),filter(x-> x.gᵧ==1,ABtrials))),[łgₚ,łg])...)) ? łgₚ : łg
+		ρ²gₚ=ρ²g+rand(Normal(0,0.5));
+		ρ²g=(log(rand(Uniform(0,1))) < -(map(z->logpdf(prior[:ρ²g],z)+sum(map(x->sslogdensity(x.yg,1,x.μg,σ²,łg,z),filter(x-> x.gᵧ==1,ABtrials))),[ρ²gₚ,ρ²g])...))?ρ²gₚ : ρ²g
+	else
+		łgₚ=łg+rand(Normal(0,0.5));
+		łg=(log(rand(Uniform(0,1))) < -(map(z->logpdf(prior[:łg],z),[łgₚ,łg])...)) ? łgₚ : łg
+		ρ²gₚ=ρ²g+rand(Normal(0,0.5));
+		ρ²g=(log(rand(Uniform(0,1))) < -(map(z->logpdf(prior[:ρ²g],z),[ρ²gₚ,ρ²g])...))?ρ²gₚ : ρ²g
 	end
 
-	for i=1:length(ABtrials)
-		trace["ABtrials"][i][iter]=ABtrials[i].gᵧ
-	end
 	trace["ρ²g"][iter]=ρ²g
 	trace["ρ²₀"][iter]=ρ²₀
 	trace["ρ²₁"][iter]=ρ²₁
 	trace["p"][iter]=p
 	trace["łg"][iter]=łg
 	trace["ł₀"][iter]=ł₀
+	trace["μ₀bar"][iter]=μ₀bar
+	trace["μ₁bar"][iter]=μ₁bar
 	trace["ł₁"][iter]=ł₁
-	trace["μ₀"][iter]=μ₀
-	trace["μ₁"][iter]=μ₁
-	trace["Λ"][iter]=Λ
-	trace["λ₀"][iter]=map(x->λ₀(x),collect(0:0.01:1))
-	trace["λ₁"][iter]=map(x->λ₁(x),collect(0:0.01:1))
-	trace["g"][iter]=map(x->(x.gᵧ==1 ? FFBS2(x.g,collect(0:0.01:1),łg,ρ²g) : SortedDict(Dict(map(x->(x,zeros(Float64,3)),collect(0:0.01:1))))),ABtrials)
-	#=trace["g"][iter]=map(x->FFBS2(x.g,collect(0:0.01:1),łg,ρ²g),ABtrials)=#
-	trace["μg"][iter]=map(x->x.μg,ABtrials)
-	trace["μprior"][iter]=map(x->x.μprior,ABtrials)
+	#=trace["Λ"][iter]=Λ=#
+	trace["λ₀"][iter]=map(x->λ₀(x),0:0.01:1)
+	trace["λ₁"][iter]=map(x->λ₁(x),0:0.01:1)
+	trace[:α][iter]=(map(x->map(y->x.α(y),0:0.01:1),ABtrials))
+	trace[:g][iter]=(map(x->map(y->x.g(y),0:0.01:1),ABtrials))
+	trace[:μg][iter]=map(x->x.μg,ABtrials)
+	trace[:gᵧ][iter]=map(x->x.gᵧ,ABtrials)
 end
 
-n=length(ABtrials)
-#=plt[:hist](map(x-> (@as _ rand(Categorical([ones(n)/(a+n);a/(a+n)])) (_ == (n+1) ? rand(Normal(0,sqrt((1+k)*σ²ₘ))) : rand(Normal(trace["μprior"][x][_],sqrt(k*σ²ₘ))))) , collect(1:niter)),100)=#
-for iter=1:3030
-	plot(collect(-3:0.01:3),map(y->(a/(a+n))*pdf(Normal(0,sqrt(1+k*σ²ₘ)),y)+sum(map(x-> (1/(a+n))*pdf(Normal(x,sqrt(k*σ²ₘ)),y),trace["μprior"][iter])),collect(-3:0.01:3)),alpha=0.1,c="blue")
-end
+plot(map(trial->trial.μg,trueABtrials),map(y->mean(map(x->trace[:μg][x][y],1:niter)),1:length(ABtrials)),linestyle="None",marker="o")
 
-	vec(map(x->trace["μg"][x],1:iter))
-	figure(3)
-	subplot(611)
-	plot(trace["μ₀"][1:iter],c="grey")
-	subplot(612)
-	plot(trace["ł₀"][1:iter],c="grey")
-	subplot(613)
-	plot(trace["ρ²₀"][1:iter],c="grey")
-	subplot(614)
-	plot(trace["μ₁"][1:iter],c="grey")
-	subplot(615)
-	plot(trace["ł₁"][1:iter],c="grey")
-	subplot(616)
-	plot(trace["ρ²₁"][1:iter],c="grey")
+map(x->plot(trace["λ₀"][x],alpha=0.1,c="blue"),1:niter)
+plot(map(x->Λ*Φ(μ₀(x)),0:0.01:1),c="red")
 
-	figure(11)
-	subplot(211)
-	plot(trace["łg"][1:iter],c="grey")
-	subplot(212)
-	plot(trace["ρ²g"][1:iter],c="grey")
+map(x->plot(trace["λ₁"][x],alpha=0.1,c="blue"),1:niter)
+plot(map(x->Λ*Φ(μ₁(x)),0:0.01:1),c="red")
 
-	figure(2)
-	plot(trace["Λ"][1:iter],c="grey")
+plot(trace["μ₀bar"])
+plot(trace["ł₀"])
+plot(trace["ρ²₀"])
+plot(trace["ł₁"])
+plot(trace["ρ²₁"])
 
-	figure(4)
-	subplot(611)
-	plot(trace["ABtrials"][1][1:iter],c="grey")
-	subplot(612)
-	plot(trace["ABtrials"][2][1:iter],c="grey")
-	subplot(613)
-	plot(trace["ABtrials"][3][1:iter],c="grey")
-	subplot(614)
-	plot(trace["ABtrials"][4][1:iter],c="grey")
-	subplot(615)
-	plot(trace["ABtrials"][5][1:iter],c="grey")
-	subplot(616)
-	plot(trace["ABtrials"][6][1:iter],c="grey")
 
-	figure()
-	foo=zeros(0)
-	for i=1:length(ABtrials)
-		println(mean(trace["ABtrials"][i]))
-		push!(foo,mean(trace["ABtrials"][i]))
-	end
-	plt[:hist](foo)
-
-	figure()
-	foo=zeros(0)
-	for i=100:iter-1
-		append!(foo,trace["μg"][i])
-	end
-	subplot(211)
-	plt[:hist](foo,100)
-	subplot(212)
-	plt[:hist](Φ(foo),100)
-
-	figure(1010)
-	subplot(211)
-	for i=collect(1:1:niter)
-		#=plot(collect(keys(trace["f₀"][i])),[trace["f₀"][i][key][1] for key in collect(keys(trace["f₀"][i]))],c="grey",alpha=0.01)=#
-		plot(trace["λ₀"][i],c="blue",alpha=0.01)
-	end
-	subplot(212)
-	for i=collect(1:1:niter)
-		#=plot(collect(keys(trace["f₁"][i])),[trace["f₁"][i][key][1] for key in collect(keys(trace["f₁"][i]))],c="grey",alpha=0.01)=#
-		plot(trace["λ₁"][i],c="blue",alpha=0.01)
-	end
-
-	figure(1)
-	subplot(211)
-	for i=100:iter
-		plot(collect(keys(trace["f₀"][i])),[trace["Λ"][i]*Φ(trace["μ₀"][i]+μ₀ₜ(key)+trace["f₀"][i][key][1]) for key in collect(keys(trace["f₀"][i]))],c="grey",alpha=0.01)
-	end
-	subplot(212)
-	for i=100:iter
-		plot(collect(keys(trace["f₁"][i])),[trace["Λ"][i]*Φ(trace["μ₁"][i]+μ₁ₜ(key)+trace["f₁"][i][key][1]) for key in collect(keys(trace["f₁"][i]))],c="grey",alpha=0.01)
-	end
-	for intAB=1:length(ABtrials)
+plot(trace["p"])
+plot(trace["łg"])
+plot(trace["ρ²g"])
+for intAB=1:length(ABtrials)
 	figure(intAB)
-	subplot(311)
-	for i=collect(1:1:niter)
-		plot(collect(keys(trace["g"][i][intAB])),[(trace["g"][i][intAB][key][1]) for key in collect(keys(trace["g"][i][intAB]))],c="blue",alpha=0.01)
+	#=plot(map(x->ABtrials[intAB].α(x),0:0.01:1))=#
+	for iter=1:niter
+		plot(trace[:α][iter][intAB],alpha=0.01,c="red")
 	end
-	plot(collect(keys(trueABtrials[intAB].g)),[trueABtrials[intAB].g[key][1]*trueABtrials[intAB].gᵧ for key in collect(keys(trueABtrials[intAB].g))],c="red")
-	subplot(312)
-	for i=collect(1:1:niter)
-		plot(collect(1/1000:1/1000:1),trace["μg"][i][intAB]*ones(1000),c="blue",alpha=0.01)
-	end
-	plot(collect(1/1000:1/1000:1),trueABtrials[intAB].μg*ones(1000),c="red")
-	subplot(313)
-	for i=collect(1:1:niter)
-		plot(collect(keys(trace["g"][i][intAB])),[Φ(trace["μg"][i][intAB]+trace["g"][i][intAB][key][1]) for key in collect(keys(trace["g"][i][intAB]))],c="blue",alpha=0.01)
-	end
-	plot(collect(keys(trueABtrials[intAB].g)),[Φ(trueABtrials[intAB].μg+trueABtrials[intAB].g[key][1]) for key in collect(keys(trueABtrials[intAB].g))],c="red")
 	ylim(-0.1,1.1)
-	savefig(string("plots/16/",intAB,".pdf"))
+	savefig(string("plots/23/",intAB,".pdf"))
 	close(intAB)
-	end
+end
+figure(44)
+plot(map(x->λ₀(x),0:0.01:1))
+plot(map(x->λ₁(x),0:0.01:1))
+savefig("plots/22/44.pdf")
+close(44)
+figure(45)
+plot(collect(1/2048:1/2048:1),kde(trace["p"]).density)
+savefig("plots/22/45.pdf")
+close(45)
 
 
-	mean(trace["ABtrials"][intAB][1:iter])
-
-	for i=100:iter
-		plot(collect(keys(trace["g"][1][i])),[trace["Λ"][i]*Φ(trace["μ₀"][i]+μ₀ₜ(key)+trace["f₀"][i][key][1]) for key in collect(keys(trace["f₀"][i]))],c="grey",alpha=0.01)
-	end
-
-	plot(1:niter,[trace["μg"][key] for key in keys(trace["μg"])])
-	λ₀mean=copy(trace["λ₀mean"])
-	λ₁mean=copy(trace["λ₁mean"])
-	λ₀var=copy(trace["λ₀var"])
-	λ₁var=copy(trace["λ₁var"])
-	λ₀u=copy(λ₀mean)
-	λ₀b=copy(λ₀mean)
-	λ₁u=copy(λ₁mean)
-	λ₁b=copy(λ₁mean)
-	for key in keys(λ₀mean)
-		λ₀mean[key]=λ₀mean[key]/iter
-		λ₀var[key]=λ₀var[key]/iter
-		λ₀u[key]=λ₀mean[key]+2*sqrt(λ₀var[key])
-		λ₀b[key]=λ₀mean[key]-2*sqrt(λ₀var[key])
-	end
-	for key in keys(λ₁mean)
-		λ₁mean[key]=λ₁mean[key]/iter
-		λ₁var[key]=λ₁var[key]/iter
-		λ₁u[key]=λ₁mean[key]+2*sqrt(λ₁var[key])
-		λ₁b[key]=λ₁mean[key]-2*sqrt(λ₁var[key])
-	end
-
-	figure(43)
-	subplot(411)
-	plot(sort(collect(keys(λ₀mean))),[λ₀mean[key] for key in sort(collect(keys(λ₀mean)))],c="blue")
-	#=plot(sort(collect(keys(λ₀u))),[λ₀u[key] for key in sort(collect(keys(λ₀mean)))],linestyle="--",c="blue")=#
-	#=plot(sort(collect(keys(λ₀b))),[λ₀b[key] for key in sort(collect(keys(λ₀mean)))],c="blue",linestyle="--")=#
-
-	subplot(412)
-	plt[:hist](vcat(map(x->collect(keys(x.ξ₀ₐ)),Atrials)...),100)
-	subplot(413)
-	plot(sort(collect(keys(λ₁mean))),[λ₁mean[key] for key in sort(collect(keys(λ₁mean)))],c="red")
-	#=plot(sort(collect(keys(λ₁u))),[λ₁u[key] for key in sort(collect(keys(λ₁mean)))],linestyle="--",c="red")=#
-	#=plot(sort(collect(keys(λ₁b))),[λ₁b[key] for key in sort(collect(keys(λ₁mean)))],c="red",linestyle="--")=#
-	subplot(414)
-	plt[:hist](vcat(map(x->collect(keys(x.ξ₁ₐ)),Btrials)...),100)
-
-
-
-	figure(44)
-		subplot(211)
-		plt[:hist](vcat(map(x->collect(keys(x.ξ₀ₐ)),Atrials)...),100)
-		ylim(0,50)
-		subplot(212)
-		plt[:hist](vcat(map(x->collect(keys(x.ξ₁ₐ)),Btrials)...),100)
-		ylim(0,50)
+plot(map(x->trueABtrials[1].α(x),0:0.01:1))
+for iter=1:niter
+	plot(map(x->trace[:α][iter][1](x),0:0.01:1),alpha=0.1,c="red")
+end

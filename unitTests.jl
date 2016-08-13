@@ -469,3 +469,16 @@ for trial in Atrials
 	plot(collect(keys(trial.y₀)),collect(values(trial.y₀)))
 	foo=readline(STDIN)
 end
+
+
+
+
+
+ρ²₁=3
+ł₁=0.2
+foo=realization(statcov(ł₁,ρ²₁),transition(ł₁),innovation(ł₁,ρ²₁),collect(0:1/1000:1))
+empty!(y₁)
+[y₁[key]=foo[key][1] for key in collect(keys(foo))]
+foob=map(z->sslogdensity(y₁,1,0,σ²,z,ρ²₁)+logpdf(prior[:ł₁],z),0.01:0.01:1)
+foob=foob-maximum(foob)
+plot(collect(0.01:0.01:1),exp(foob))
